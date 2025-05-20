@@ -1,0 +1,13 @@
+body {
+  margin: 0; /* 移除頁面邊距 */
+  display: flex; /* 將畫布置中 */
+  justify-content: center;
+  align-items: center;
+  height: 100vh; /* 畫布垂直居中 */
+  background-color: #f0f0f0; /* 頁面背景色 */
+}
+
+canvas {
+  border: none !important;
+  display: block;
+}
