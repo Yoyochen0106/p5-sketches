@@ -105,14 +105,22 @@ class TypeWriter {
     }
 }
 
+function factorial(x) {
+    let s = 1;
+    for (let i = 1; i <= x; i++) {
+        s *= i;
+    }
+    return s;
+}
+
 function draw() {
     background(192);
 
-    // let func = new Sine();
+    let func = new Sine();
     // let func = new Mirrored(new Sine(), 0, 1);
     // let func = new Mirrored(new Poly([0, 0, 3, -2]), 0, 1); // this shows the reflection point of 2nd derivative // this look like sine
     // let func = new Poly([0, 0, 3, -2]);
-    let func = new Poly([0, 0, 1.0]);
+    // let func = new Poly([0, 0, 1.0]);
     let func_taylor = new Poly([0, 0, 0]);
     let tw = new TypeWriter(0, 20);
 
@@ -124,10 +132,11 @@ function draw() {
     let h = 1e-3;
     // let der = (func.call(taylor_x+h) - taylor_y) / h
     let der = calc_derivative(func, 1, taylor_x, h);
-    let der2 = calc_derivative(func, 2, taylor_x, h);
+    let der2 = calc_derivative(func, 2, taylor_x, h) / factorial(2);
+    let der3 = calc_derivative(func, 3, taylor_x, h) / factorial(3);
     func_taylor.coeffs[0] = taylor_y;
     func_taylor.coeffs[1] = der;
-    func_taylor.coeffs[2] = der2;
+    func_taylor.coeffs[3] = der3;
     
     // let a = der;
     // let b = ;
