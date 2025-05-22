@@ -15,6 +15,24 @@ class Sine {
     }
 }
 
+function mod(x, y) {
+    return x - Math.floor(x / y) * y;
+}
+
+class Mirrored {
+    constructor(func, xmin, xmax) {
+        this.func = func;
+        this.xmin = xmin;
+        this.xmax = xmax;
+    }
+    call(x) {
+        let size = this.xmax - this.xmin;
+        let x2 = mod(x - this.xmin, 2*size) + this.xmin;
+        if (x2 > size) x2 = 2*size - x2;
+        return this.func.call(x2);
+    }
+}
+
 class Poly {
     constructor(coeffs) {
         this.coeffs = coeffs;
@@ -30,8 +48,8 @@ class Poly {
     }
 }
 
-let [xmin, xmax] = [-2, 2];
-let [ymin, ymax] = [-5, 5];
+let [xmin, xmax] = [-5, 5];
+let [ymin, ymax] = [-2, 2];
 function x_to_scr(x) {
     return map(x, xmin, xmax, 0, windowWidth);
 }
@@ -61,7 +79,7 @@ class TypeWriter {
     constructor(x, y) {
         this.x = x
         this.y = y
-        this.line_gap = 50;
+        this.line_gap = 20;
     }
 
     type(str) {
@@ -90,8 +108,11 @@ class TypeWriter {
 function draw() {
     background(192);
 
-    let func = new Sine();
-    // let func = new Poly([0, 0, 1.0]);
+    // let func = new Sine();
+    // let func = new Mirrored(new Sine(), 0, 1);
+    // let func = new Mirrored(new Poly([0, 0, 3, -2]), 0, 1); // this shows the reflection point of 2nd derivative // this look like sine
+    // let func = new Poly([0, 0, 3, -2]);
+    let func = new Poly([0, 0, 1.0]);
     let func_taylor = new Poly([0, 0, 0]);
     let tw = new TypeWriter(0, 20);
 
@@ -142,9 +163,12 @@ function draw() {
     }
 
     tw.type(`f(x) = `).newline();
-    tw.type(`       ${taylor_y.toFixed(3).padStart(10)}`).newline()
-    tw.type(`     + ${der.toFixed(3).padStart(10)} x`).newline()
-    tw.type(`     + ${der2.toFixed(3).padStart(10)} x`).super("2").newline()
+    f = n => n.toFixed(3).padStart(10);
+    tw.type(`       ${f(taylor_y)}`).newline()
+    tw.type(`     + ${f(der)} (x - ${f(taylor_x)})`).newline()
+    tw.type(`     + ${f(der2)} (x - ${f(taylor_x)})`).super("2").newline()
+    tw.newline()
+    tw.type(`mouse (x, y) = (${f(taylor_x)}, ${f(taylor_y)})`)
 
     stroke(255, 0, 0);
     line(x_to_scr(taylor_x), 0, x_to_scr(taylor_x), windowHeight);
