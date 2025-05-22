@@ -9,7 +9,16 @@ function windowResized() {
 
 let _2pi = 2*Math.PI;
 
-class Sine {
+class Func {
+    constructor(f) {
+        this.f = f;
+    }
+    call(x) {
+        return this.f(x);
+    }
+}
+
+class ComposedSine {
     call(x) {
         return 0.5*Math.sin(_2pi*x) + 0.5*Math.sin(_2pi*2*x);
     }
@@ -121,13 +130,27 @@ function factorial(x) {
     return s;
 }
 
+function mouseClicked() {
+    // mouseX, mouseY
+}
+
+function keyPressed() {
+    if (key === 'w') { order++; }
+    if (key === 's' && order > 0) { order--; }
+
+//   if (keyCode === ENTER) {
+}
+
+let order = 9;
+
 function draw() {
     background(192);
 
-    let func = new Sine();
-    // let func = new Mirrored(new Sine(), 0, 1);
+    // let func = new Func(x => Math.sin(_2pi*x));
+    // let func = new ComposedSine();
+    // let func = new Mirrored(new ComposedSine(), 0, 1);
     // let func = new Mirrored(new Poly([0, 0, 3, -2]), 0, 1); // this shows the reflection point of 2nd derivative // this look like sine
-    // let func = new Poly([0, 0, 3, -2]);
+    let func = new Poly([0, 0, 3, -2]);
     // let func = new Poly([0, 0, 1.0]);
     let tw = new TypeWriter(0, 20);
 
@@ -137,7 +160,6 @@ function draw() {
     let taylor_x = map(mouseX, 0, windowWidth, xmin, xmax);
     let taylor_y = func.call(taylor_x)
     let h = 1e-2;
-    let order = 9;
     let func_taylor = calc_taylor_series(func, taylor_x, h, order);
     
     stroke(0);
@@ -170,8 +192,9 @@ function draw() {
         py_der = py;
     }
 
-    tw.type(`f(x) = `).newline();
     f = n => n.toFixed(3).padStart(10);
+    tw.type(`order = ${order.toString()}`).newline();
+    tw.type(`f(x) = `).newline();
     for (let i = 0; i < func_taylor.coeffs.length; i++) {
         let n = func_taylor.coeffs[i]
         if (i == 0) {
