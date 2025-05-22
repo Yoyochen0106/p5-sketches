@@ -75,6 +75,14 @@ function calc_derivative(func, order, x, h) {
     return samples[0];
 }
 
+function calc_taylor_series(func, x, h, order) {
+    let coeff = []
+    for (let i = 0; i <= order; i++) {
+        coeff.push(calc_derivative(func, i, x, h) / factorial(i))
+    }
+    return new Poly(coeff)
+}
+
 class TypeWriter {
     constructor(x, y) {
         this.x = x
@@ -121,7 +129,6 @@ function draw() {
     // let func = new Mirrored(new Poly([0, 0, 3, -2]), 0, 1); // this shows the reflection point of 2nd derivative // this look like sine
     // let func = new Poly([0, 0, 3, -2]);
     // let func = new Poly([0, 0, 1.0]);
-    let func_taylor = new Poly([0, 0, 0]);
     let tw = new TypeWriter(0, 20);
 
     let prev_px;
@@ -129,18 +136,10 @@ function draw() {
 
     let taylor_x = map(mouseX, 0, windowWidth, xmin, xmax);
     let taylor_y = func.call(taylor_x)
-    let h = 1e-3;
-    // let der = (func.call(taylor_x+h) - taylor_y) / h
-    let der = calc_derivative(func, 1, taylor_x, h);
-    let der2 = calc_derivative(func, 2, taylor_x, h) / factorial(2);
-    let der3 = calc_derivative(func, 3, taylor_x, h) / factorial(3);
-    func_taylor.coeffs[0] = taylor_y;
-    func_taylor.coeffs[1] = der;
-    func_taylor.coeffs[3] = der3;
+    let h = 1e-2;
+    let order = 9;
+    let func_taylor = calc_taylor_series(func, taylor_x, h, order);
     
-    // let a = der;
-    // let b = ;
-
     stroke(0);
 
     for (var i = 0; i < 1000; i++) {
@@ -173,9 +172,16 @@ function draw() {
 
     tw.type(`f(x) = `).newline();
     f = n => n.toFixed(3).padStart(10);
-    tw.type(`       ${f(taylor_y)}`).newline()
-    tw.type(`     + ${f(der)} (x - ${f(taylor_x)})`).newline()
-    tw.type(`     + ${f(der2)} (x - ${f(taylor_x)})`).super("2").newline()
+    for (let i = 0; i < func_taylor.coeffs.length; i++) {
+        let n = func_taylor.coeffs[i]
+        if (i == 0) {
+            tw.type(`       ${f(n)}`).newline()
+        } else if (i == 1) {
+            tw.type(`     + ${f(n)} (x - ${f(taylor_x)})`).newline()
+        } else {
+            tw.type(`     + ${f(n)} (x - ${f(taylor_x)})`).super(`${i}`).newline()
+        }
+    }
     tw.newline()
     tw.type(`mouse (x, y) = (${f(taylor_x)}, ${f(taylor_y)})`)
 
