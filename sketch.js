@@ -141,7 +141,7 @@ function keyPressed() {
 //   if (keyCode === ENTER) {
 }
 
-let order = 9;
+let order = 2;
 
 function draw() {
     background(192);
@@ -206,7 +206,8 @@ function draw() {
         }
     }
     tw.newline()
-    tw.type(`mouse (x, y) = (${f(taylor_x)}, ${f(taylor_y)})`)
+    tw.type(`mouse (x, y) = (${f(taylor_x)}, ${f(taylor_y)})`).newline()
+    tw.type(`acc (x, y, z) = (${f(accelerationX)}, ${f(accelerationY)}), ${f(accelerationZ)})`).newline()
 
     stroke(255, 0, 0);
     line(x_to_scr(taylor_x), 0, x_to_scr(taylor_x), windowHeight);
