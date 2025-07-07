@@ -20,7 +20,7 @@ class Func {
 
 class ComposedSine {
     call(x) {
-        return 0.5*Math.sin(_2pi*x) + 0.5*Math.sin(_2pi*2*x);
+        return 0.5*Math.sin(_2pi*0.5*x) + 0.5*Math.sin(_2pi*x);
     }
 }
 
@@ -147,10 +147,10 @@ function draw() {
     background(192);
 
     // let func = new Func(x => Math.sin(_2pi*x));
-    // let func = new ComposedSine();
+    let func = new ComposedSine();
     // let func = new Mirrored(new ComposedSine(), 0, 1);
     // let func = new Mirrored(new Poly([0, 0, 3, -2]), 0, 1); // this shows the reflection point of 2nd derivative // this look like sine
-    let func = new Poly([0, 0, 3, -2]);
+    // let func = new Poly([0, 0, 3, -2]);
     // let func = new Poly([0, 0, 1.0]);
     let tw = new TypeWriter(0, 20);
 
