@@ -60,4 +60,10 @@ export const SKETCHES = [
     description: 'Two conics, a chain of tangents: if the polygon closes for one start point it closes for all of them.',
     load: () => import('./poncelet/index.js'),
   },
+  {
+    id: 'elliptic',
+    title: 'Elliptic Curve Group',
+    description: 'Chord-and-tangent addition on y\u00b2 = x\u00b3 + ax + b over the reals, over finite fields F_p, and via the complex torus C/(Z + \u03c4Z).',
+    load: () => import('./elliptic/index.js'),
+  },
 ];
