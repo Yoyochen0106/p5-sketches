@@ -246,7 +246,7 @@ export const SKETCHES = [
     unit: 5,
     title: 'PDEs by Fourier Series: Heat, Wave & Laplace',
     description: 'Separation of variables: Fourier series solutions of the heat, wave and Laplace equations with animated partial sums.',
-    planned: true,
+    load: () => import('./ma-pde/index.js'),
     prereqs: ['ma-ode', 'ma-vector'],
     related: [
       { id: 'chladni', label: 'Chladni plates', why: 'Eigenmodes of a vibrating plate' },
