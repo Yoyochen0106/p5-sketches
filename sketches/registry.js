@@ -42,4 +42,10 @@ export const SKETCHES = [
     description: 'Vibrating square, rectangular and circular plates: eigenmodes, mode mixing, driven resonance sweeps, nodal lines and sand.',
     load: () => import('./chladni/index.js'),
   },
+  {
+    id: 'iso',
+    title: 'Marching Squares & Cubes',
+    description: 'Contours and isosurfaces of scalar fields: inspect single cells, the 256 cube cases, cracks and slices.',
+    load: () => import('./iso/index.js'),
+  },
 ];
