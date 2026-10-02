@@ -18,6 +18,21 @@ npm test               # node --test "tests/**/*.test.js"  (no browser needed)
 | `lib/` | Pure math, importable from the browser and Node: complex numbers, algebras, truncated power series (automatic differentiation), Pade, Fourier, wavelets, domain colouring. |
 | `tests/` | `node:test` suites plus `tests/mock-p5.js`, a recording fake p5 used to test sketches headlessly. |
 
+## Sketches
+
+| Route | Sketch |
+|---|---|
+| `#/approx` | Function Approximation Lab (Taylor, Pade, Fourier + Gibbs windows, wavelets, interpolation, sonification; real + complex panels) |
+| `#/iso` | Marching Squares & Cubes (cell / cube-case inspectors, crack detector, slice plane, STL/OBJ export) |
+| `#/fourier2d` | Fourier Painter (epicycles for drawn curves, 2D FFT filtering of painted images) |
+| `#/chladni` | Chladni Plates (eigenmodes, mode mixing, driven resonance, sand) |
+| `#/conformal` | Conformal Maps (grids and angles under complex maps) |
+| `#/monge` | Monge's Theorem (three draggable circles) |
+| `#/equal-area` | Equal-Area Transformations (shear, polygon reduction, squaring) |
+| `#/hello` | Demo of the sketch API |
+
+Shortcuts: `d` toggles the settings drawer.
+
 ## Adding a sketch
 
 1. Create `sketches/<id>/index.js` exporting the object above (`ctx` gives you `p5`, a persisted
