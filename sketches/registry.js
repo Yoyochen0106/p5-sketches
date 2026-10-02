@@ -24,4 +24,10 @@ export const SKETCHES = [
     description: 'Draw a curve and watch epicycles fit it, or paint an image and keep only some 2D frequencies.',
     load: () => import('./fourier2d/index.js'),
   },
+  {
+    id: 'equal-area',
+    title: 'Equal-Area Transformations',
+    description: 'Slide a vertex parallel to the opposite side: the area never changes. Triangles, polygon reduction and squaring the triangle.',
+    load: () => import('./equal-area/index.js'),
+  },
 ];
