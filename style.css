@@ -140,3 +140,76 @@ a { color: inherit; }
 .ui-group.collapsed .ui-group-toggle::before { content: "\25B8  "; }
 .ui-group-body { padding-bottom: 2px; }
 .ui-group-body.disabled { opacity: 0.45; }
+
+/* ---- home sections, courses ---- */
+.home-section { margin-top: 24px; }
+.section-title { margin: 0; font-size: 1.15rem; }
+.section-toggle {
+  font: inherit; font-weight: bold; color: var(--text); background: none; border: 0;
+  padding: 4px 0; cursor: pointer; text-align: left;
+}
+.section-toggle:hover { color: var(--accent); }
+.home-section .cards, .course-cards { margin-top: 12px; }
+.course-cards { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 16px; }
+.course-card {
+  display: block; padding: 20px 18px; text-decoration: none;
+  background: var(--panel); border: 1px solid var(--border); border-top: 4px solid var(--accent); border-radius: 10px;
+  transition: border-color 0.15s, transform 0.15s;
+}
+.course-card:hover, .course-card:focus-visible { border-color: var(--accent); transform: translateY(-2px); }
+.course-card h3 { margin: 0 0 8px; font-size: 1.25rem; }
+.course-card p { margin: 0 0 12px; color: var(--muted); line-height: 1.4; }
+.course-meta { color: var(--accent); font-size: 12px; }
+
+.breadcrumb { display: flex; align-items: center; gap: 2px; color: var(--muted); white-space: nowrap; min-width: 0; }
+.breadcrumb a { color: var(--accent); text-decoration: none; }
+.breadcrumb a:hover { text-decoration: underline; }
+.breadcrumb .current { color: var(--text); overflow: hidden; text-overflow: ellipsis; }
+.course-title { margin: 20px 0 6px; font-size: 1.6rem; }
+.course-desc { margin: 0 0 16px; color: var(--muted); line-height: 1.4; }
+.unit-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.unit-card {
+  position: relative; display: flex; gap: 14px; padding: 14px;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+}
+.unit-card:not(.planned):hover { border-color: var(--accent); }
+.unit-card.planned { opacity: 0.6; border-style: dashed; }
+.unit-num {
+  flex: 0 0 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+  background: var(--panel-2); color: var(--accent); font-weight: bold;
+}
+.unit-main { min-width: 0; }
+.unit-main h3 { margin: 0 0 6px; font-size: 1.05rem; display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.unit-main p { margin: 0; color: var(--muted); line-height: 1.4; }
+.unit-link { color: var(--accent); text-decoration: none; }
+.unit-link::after { content: ""; position: absolute; inset: 0; border-radius: 10px; }
+.badge { font-size: 11px; font-weight: normal; padding: 1px 8px; border-radius: 10px; border: 1px solid var(--border); color: var(--muted); }
+.visited { color: #66bb6a; font-weight: bold; }
+.tags { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.tag { position: relative; z-index: 1; font-size: 11px; padding: 2px 8px; border-radius: 10px; background: var(--panel-2); color: var(--muted); text-decoration: none; }
+a.tag:hover { color: var(--accent); }
+.tag.prereq { border: 1px dashed var(--border); background: none; }
+
+/* unit navigation in the sketch top bar */
+.course-nav { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.bar-btn.disabled { opacity: 0.4; cursor: default; pointer-events: none; }
+.unit-select {
+  font: inherit; color: var(--text); background: var(--panel-2); border: 1px solid var(--border);
+  border-radius: 6px; padding: 4px 6px; max-width: 220px;
+}
+
+/* related section in the drawer */
+.related { padding: 0 10px 14px; border-top: 1px solid var(--border); }
+.related h3 { margin: 12px 0 8px; font-size: 0.95rem; }
+.related ul { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 8px; }
+.related-item a { display: block; text-decoration: none; padding: 6px 8px; border: 1px solid var(--border); border-radius: 6px; }
+.related-item a:hover { border-color: var(--accent); }
+.related-item.disabled { opacity: 0.5; padding: 6px 8px; border: 1px dashed var(--border); border-radius: 6px; }
+.related-label { display: block; color: var(--accent); }
+.related-why { display: block; color: var(--muted); font-size: 12px; line-height: 1.35; }
+.related-soon { font-size: 11px; color: var(--muted); }
+
+@media (max-width: 640px) {
+  .unit-card { padding: 10px; gap: 10px; }
+  .course-nav .breadcrumb .sep, .unit-select { display: none; }
+}

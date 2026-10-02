@@ -25,18 +25,19 @@ test('registry lists approx and hello with lazy loaders', () => {
   assert.equal(new Set(ids).size, ids.length, 'ids are unique');
   assert.equal(SKETCHES[0].title, 'Function Approximation Lab');
   for (const s of SKETCHES) {
-    assert.equal(typeof s.load, 'function');
+    if (!s.planned) assert.equal(typeof s.load, 'function');
     assert.ok(s.description);
   }
 });
 
-test('menu route renders a card per sketch linking to #/<id>', () => withFakeDocument(async (doc) => {
+test('menu route renders a card per misc sketch linking to #/<id>', () => withFakeDocument(async (doc) => {
   const { root, app } = setup(doc, { hash: '#/', registry: SKETCHES.map((s) => ({ ...s })) });
   await app.start();
   const cards = root.querySelectorAll('.card');
-  assert.equal(cards.length, SKETCHES.length);
+  const misc = SKETCHES.filter((s) => (s.group || 'misc') === 'misc');
+  assert.equal(cards.length, misc.length);
   const hrefs = [...cards].map((c) => c.getAttribute('href'));
-  assert.deepEqual(hrefs, SKETCHES.map((s) => `#/${s.id}`));
+  assert.deepEqual(hrefs, misc.map((s) => `#/${s.id}`));
   assert.match(cards[0].textContent, /Function Approximation Lab/);
   assert.equal(app.current(), '');
   assert.equal(doc.documentElement.getAttribute('data-theme'), 'dark');

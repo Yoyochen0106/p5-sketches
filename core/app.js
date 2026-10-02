@@ -2,7 +2,7 @@
 // createApp() takes all environment pieces as options so Node tests can inject fakes; the
 // module auto-starts only when a real browser document with #app exists.
 
-import { parseHash, buildHash, onRoute, createHashSync } from './router.js';
+import { parseHash, buildHash, buildCourseHash, onRoute, createHashSync } from './router.js';
 import { createStore } from './settings.js';
 import * as ui from './ui.js';
 import { h, clear } from './ui.js';
@@ -15,6 +15,11 @@ export function createApp(opts = {}) {
   const win = opts.window || globalThis.window || globalThis;
   const storage = opts.storage; // undefined -> settings picks localStorage / memory
   const registry = opts.registry || [];
+  const courses = opts.courses || [];
+  const byId = (id) => registry.find((s) => s.id === id);
+  const courseById = (id) => courses.find((c) => c.id === id);
+  const unitsOf = (c) => c.units.map(byId).filter(Boolean);
+  const isPlanned = (e) => !!(e && (e.planned || typeof e.load !== 'function'));
   const resizeDebounce = opts.debounceMs ?? 120;
   const root = opts.root || document.getElementById('app') || document.body;
   const getP5 = () => opts.p5 || win.p5;
@@ -52,17 +57,128 @@ export function createApp(opts = {}) {
   }
 
   // ---- pages ----------------------------------------------------------------------------
+  // collapsible home sections are remembered in globalSettings ('collapsed:<name>')
+  function section(name, title, bodyEl, extraClass) {
+    const key = `collapsed:${name}`;
+    let collapsed = globalSettings.get(key, false) === true;
+    const btn = h('button', { type: 'button', class: 'section-toggle', 'data-section': name });
+    const body = h('div', { class: 'section-body' }, bodyEl);
+    const paint = () => {
+      btn.textContent = `${collapsed ? '▸' : '▾'} ${title}`;
+      btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+      body.hidden = collapsed;
+    };
+    btn.addEventListener('click', () => { collapsed = !collapsed; globalSettings.set(key, collapsed); paint(); });
+    paint();
+    return h('section', { class: `home-section ${extraClass || ''}`, 'data-section': name }, h('h2', { class: 'section-title' }, btn), body);
+  }
+
+  const miscEntries = () => registry.filter((s) => (s.group || 'misc') !== 'course');
+
   function renderMenu() {
     clear(root);
     const theme = themeButton();
-    const cards = registry.map((s) =>
+    const miscCards = miscEntries().map((s) =>
       h('a', { class: 'card', href: buildHash(s.id), 'data-id': s.id },
         h('h2', null, s.title), h('p', null, s.description || '')));
+    const courseCards = courses.map((c) => {
+      const units = unitsOf(c);
+      const done = units.filter((u) => !isPlanned(u)).length;
+      return h('a', { class: 'course-card', href: buildCourseHash(c.id), 'data-id': c.id, style: c.accent ? { borderTopColor: c.accent } : null },
+        h('h3', null, c.title), h('p', null, c.description || ''),
+        h('div', { class: 'course-meta' }, `${units.length} units · ${done} implemented`));
+    });
     const page = h('div', { class: 'menu-page' },
       h('header', { class: 'menu-header' }, h('h1', null, 'p5 sketches'), theme.el),
-      h('main', { class: 'cards' }, cards));
+      courses.length ? section('courses', 'Courses', h('div', { class: 'course-cards' }, courseCards), 'courses-section') : null,
+      section('misc', 'Misc', h('div', { class: 'cards' }, miscCards), 'misc-section'));
     root.appendChild(page);
     return () => { theme.dispose(); clear(root); };
+  }
+
+  const visitedList = () => {
+    const v = globalSettings.get('visited', []);
+    return Array.isArray(v) ? v : [];
+  };
+  function markVisited(id) {
+    const v = visitedList();
+    if (!v.includes(id)) globalSettings.set('visited', [...v, id]);
+  }
+
+  function renderCourse(course) {
+    clear(root);
+    const theme = themeButton();
+    const visited = visitedList();
+    const units = unitsOf(course);
+    const tagLink = (r) => {
+      const t = byId(r.id);
+      return h('a', { class: 'tag related', href: buildHash(r.id, r.params || {}), title: r.why || '' }, `→ ${r.label || (t && t.title) || r.id}`);
+    };
+    const items = units.map((u, i) => {
+      const planned = isPlanned(u);
+      const prereqs = (u.prereqs || []).map((id) => h('span', { class: 'tag prereq' }, `needs: ${(byId(id) || { title: id }).title}`));
+      const related = (u.related || []).map(tagLink);
+      return h('li', { class: `unit-card${planned ? ' planned' : ''}`, 'data-id': u.id },
+        h('span', { class: 'unit-num' }, String(u.unit || i + 1)),
+        h('div', { class: 'unit-main' },
+          h('h3', null,
+            planned ? h('span', { class: 'unit-title' }, u.title) : h('a', { class: 'unit-link', href: buildHash(u.id) }, u.title),
+            planned ? h('span', { class: 'badge planned-badge' }, 'planned') : null,
+            visited.includes(u.id) ? h('span', { class: 'visited', title: 'visited' }, '✓') : null),
+          h('p', null, u.description || ''),
+          prereqs.length || related.length ? h('div', { class: 'tags' }, prereqs, related) : null));
+    });
+    const page = h('div', { class: 'menu-page course-page' },
+      h('header', { class: 'menu-header' },
+        h('nav', { class: 'breadcrumb', 'aria-label': 'Breadcrumb' }, h('a', { href: '#/' }, 'Home'), h('span', { class: 'sep' }, ' › '), h('span', { class: 'current' }, course.title)),
+        theme.el),
+      h('h1', { class: 'course-title' }, course.title),
+      h('p', { class: 'course-desc' }, course.description || ''),
+      h('ol', { class: 'unit-list' }, items));
+    root.appendChild(page);
+    return () => { theme.dispose(); clear(root); };
+  }
+
+  // top-bar navigation for a sketch that is a course unit: breadcrumb, prev/next, unit dropdown
+  function courseNav(entry) {
+    const course = entry.course && courseById(entry.course);
+    if (!course) return null;
+    const units = unitsOf(course);
+    const idx = units.findIndex((u) => u.id === entry.id);
+    if (idx < 0) return null;
+    const find = (dir) => {
+      for (let i = idx + dir; i >= 0 && i < units.length; i += dir) if (!isPlanned(units[i])) return units[i];
+      return null;
+    };
+    const arrow = (cls, label, target, title) => (target
+      ? h('a', { class: `bar-btn unit-nav ${cls}`, href: buildHash(target.id), title: `${title}: ${target.title}` }, label)
+      : h('span', { class: `bar-btn unit-nav ${cls} disabled`, 'aria-disabled': 'true', title: `${title}: none` }, label));
+    const select = h('select', { class: 'unit-select', 'aria-label': 'Unit' },
+      units.map((u, i) => h('option', { value: u.id, selected: u.id === entry.id, disabled: isPlanned(u) },
+        `${i + 1}. ${u.title}${isPlanned(u) ? ' (planned)' : ''}`)));
+    select.value = entry.id;
+    select.addEventListener('change', () => { if (select.value && select.value !== entry.id) win.location.hash = buildHash(select.value); });
+    return h('div', { class: 'course-nav' },
+      h('nav', { class: 'breadcrumb', 'aria-label': 'Breadcrumb' },
+        h('a', { href: buildCourseHash(course.id), title: course.title }, course.title),
+        h('span', { class: 'sep' }, ' › '),
+        h('span', { class: 'unit-pos' }, `Unit ${idx + 1}/${units.length}`)),
+      arrow('unit-prev', '‹ Prev', find(-1), 'Previous unit'),
+      select,
+      arrow('unit-next', 'Next ›', find(1), 'Next unit'));
+  }
+
+  function relatedSection(entry) {
+    const rel = entry.related || [];
+    if (!rel.length) return null;
+    return h('div', { class: 'related' },
+      h('h3', null, 'Related'),
+      h('ul', null, rel.map((r) => {
+        const t = byId(r.id);
+        const text = [h('span', { class: 'related-label' }, r.label || (t && t.title) || r.id), r.why ? h('span', { class: 'related-why' }, r.why) : null];
+        if (!t || isPlanned(t)) return h('li', { class: 'related-item disabled', 'data-id': r.id }, text, h('span', { class: 'related-soon' }, 'coming soon'));
+        return h('li', { class: 'related-item', 'data-id': r.id }, h('a', { href: buildHash(r.id, r.params || {}) }, text));
+      })));
   }
 
   async function renderSketch(entry, route, myTicket) {
@@ -74,11 +190,12 @@ export function createApp(opts = {}) {
     const drawerBtn = h('button', { type: 'button', class: 'bar-btn drawer-btn', 'aria-expanded': 'true', title: 'Settings (d)' }, 'Settings');
     const fsBtn = h('button', { type: 'button', class: 'bar-btn fs-btn', title: 'Fullscreen' }, 'Fullscreen');
     const back = h('a', { class: 'bar-btn back', href: '#/', title: 'Back to menu' }, 'Menu');
-    const aside = h('aside', { class: 'drawer', id: 'drawer', 'aria-label': 'Settings' }, drawer);
+    const aside = h('aside', { class: 'drawer', id: 'drawer', 'aria-label': 'Settings' }, drawer, relatedSection(entry));
     const page = h('div', { class: 'sketch-page' },
-      h('header', { class: 'topbar' }, back, h('span', { class: 'title' }, entry.title), toolbar, theme.el, fsBtn, drawerBtn),
+      h('header', { class: 'topbar' }, back, courseNav(entry), h('span', { class: 'title' }, entry.title), toolbar, theme.el, fsBtn, drawerBtn),
       h('main', { class: 'stage' }, container, aside));
     root.appendChild(page);
+    if (entry.course) markVisited(entry.id);
 
     const narrow = !!(win.matchMedia && win.matchMedia('(max-width: 640px)').matches);
     let open = globalSettings.get('drawerOpen', !narrow) !== false;
@@ -150,6 +267,8 @@ export function createApp(opts = {}) {
       p5: getP5(), settings, globalSettings, ui, drawer, toolbar,
       onResize(fn) { resizeFns.add(fn); return () => resizeFns.delete(fn); },
       size,
+      link: (id, params) => buildHash(id, params || {}),
+      navigate: (id, params) => { win.location.hash = buildHash(id, params || {}); },
     };
     try {
       const mod = await entry.load();
@@ -174,13 +293,23 @@ export function createApp(opts = {}) {
     if (myTicket !== ticket) return; // superseded while queued
     await leave();
     if (myTicket !== ticket) return;
-    const entry = route.id ? registry.find((s) => s.id === route.id) : null;
-    if (!route.id) {
+    const entry = route.id ? byId(route.id) : null;
+    const course = route.course !== undefined ? courseById(route.course) : null;
+    const fixUrl = (to) => { if (win.history && win.history.replaceState) win.history.replaceState(null, '', to); };
+    if (course) {
+      routeState = { id: '', course: course.id, cleanup: renderCourse(course) };
+    } else if (!route.id) {
+      if (route.course !== undefined) fixUrl('#/'); // unknown course
       routeState = { id: '', cleanup: renderMenu() };
     } else if (!entry) {
       // unknown route: fall back to the menu and fix the URL without adding a history entry
-      if (win.history && win.history.replaceState) win.history.replaceState(null, '', '#/');
+      fixUrl('#/');
       routeState = { id: '', cleanup: renderMenu() };
+    } else if (isPlanned(entry)) {
+      // not implemented yet: show its course page (or the menu)
+      const c = entry.course && courseById(entry.course);
+      fixUrl(c ? buildCourseHash(c.id) : '#/');
+      routeState = c ? { id: '', course: c.id, cleanup: renderCourse(c) } : { id: '', cleanup: renderMenu() };
     } else {
       routeState = { id: entry.id };
       await renderSketch(entry, route, myTicket);
@@ -216,8 +345,8 @@ export function createApp(opts = {}) {
 // ---- browser auto-start ---------------------------------------------------------------------
 if (typeof globalThis.document !== 'undefined' && typeof globalThis.window !== 'undefined' && globalThis.document.getElementById
     && globalThis.document.getElementById('app')) {
-  const { SKETCHES } = await import('../sketches/registry.js');
-  const app = createApp({ registry: SKETCHES });
+  const { SKETCHES, COURSES } = await import('../sketches/registry.js');
+  const app = createApp({ registry: SKETCHES, courses: COURSES });
   globalThis.__app = app;
   app.start();
 }

@@ -13,7 +13,7 @@ npm test               # node --test "tests/**/*.test.js"  (no browser needed)
 |---|---|
 | `index.html`, `style.css` | App shell (menu page + sketch page with settings drawer). |
 | `core/` | Router, persisted settings store (localStorage + URL hash), DOM UI builder, app lifecycle. |
-| `sketches/registry.js` | List of sketches shown on the main menu. |
+| `sketches/registry.js` | `SKETCHES` (flat list of all sketches and planned course units) and `COURSES` (ordered unit ids per course). |
 | `sketches/<id>/index.js` | One sketch: `export default { id, title, description, mount(container, ctx) }`. |
 | `lib/` | Pure math, importable from the browser and Node: complex numbers, algebras, truncated power series (automatic differentiation), Pade, Fourier, wavelets, domain colouring. |
 | `tests/` | `node:test` suites plus `tests/mock-p5.js`, a recording fake p5 used to test sketches headlessly. |
@@ -38,11 +38,24 @@ npm test               # node --test "tests/**/*.test.js"  (no browser needed)
 
 Shortcuts: `d` toggles the settings drawer.
 
+## Structure: home, courses, misc
+
+- `#/` home page with two collapsible sections (state kept in the global settings): **Courses** (large cards with unit counts)
+  and **Misc** (the stand-alone sketches).
+- `#/course/<courseId>` course page: breadcrumb, ordered unit cards (description, prerequisites, related links, `planned` badge,
+  visited check). `course` is a reserved id. Unknown routes show the home page.
+- A sketch that belongs to a course gets `Course > Unit n/N`, Prev/Next (planned units are skipped) and a unit dropdown in the top bar.
+  Any sketch with `related` entries gets a **Related** section at the bottom of the drawer.
+- Registry entry: `{ id, title, description, load, group?: 'misc'|'course', course?, unit?, planned?, related?: [{id,label,why,params?}], prereqs?: [ids] }`.
+  `planned: true` entries have no `load` and are shown as disabled cards. `COURSES = [{ id, title, description, accent, units: [ids] }]`.
+- `ctx.link(id, params?)` returns `'#/id?k=v'`; `ctx.navigate(id, params?)` goes there (deep links open a sketch pre-configured
+  through its settings keys). Visited units are stored in the global settings under `visited`.
+
 ## Adding a sketch
 
 1. Create `sketches/<id>/index.js` exporting the object above (`ctx` gives you `p5`, a persisted
    `settings` store, `ui.build(schema, store, ctx.drawer)` for the settings drawer, `toolbar`, `onResize`).
-2. Add one line to `sketches/registry.js`.
+2. Add one entry to `sketches/registry.js` (for a course unit also set `group: 'course'`, `course`, `unit`, and drop `planned`/add `load`).
 
 ## Sketch: Function Approximation Lab (`#/approx`)
 

@@ -1,4 +1,6 @@
 // Hash router. Routes look like  #/<id>?key=value&key2=value2  ; '#/' or '' is the menu.
+// '#/course/<courseId>' is a course page: parseHash returns { id: '', course: '<courseId>', params }
+// (the key `course` exists only for course routes). The sketch id 'course' is therefore reserved.
 
 export function parseHash(hash) {
   let s = String(hash || '');
@@ -17,6 +19,9 @@ export function parseHash(hash) {
       params[k] = v;
     }
   }
+  if (id === 'course' || id.startsWith('course/')) {
+    return { id: '', course: safeDecode(id.slice('course/'.length)), params };
+  }
   return { id, params };
 }
 
@@ -32,6 +37,10 @@ export function buildHash(id, params = {}) {
     parts.push(`${encodeURIComponent(k)}=${encodeURIComponent(String(params[k]))}`);
   }
   return parts.length ? `${base}?${parts.join('&')}` : base;
+}
+
+export function buildCourseHash(courseId) {
+  return `#/course/${encodeURIComponent(courseId)}`;
 }
 
 // Calls fn(route) now and on every hashchange. Returns an unsubscribe function.
