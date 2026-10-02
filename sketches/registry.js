@@ -54,4 +54,10 @@ export const SKETCHES = [
     description: 'Draw an input and an output like a terrain and recover the impulse response h with y = x * h, in time and frequency.',
     load: () => import('./impulse/index.js'),
   },
+  {
+    id: 'poncelet',
+    title: "Poncelet's Porism",
+    description: 'Two conics, a chain of tangents: if the polygon closes for one start point it closes for all of them.',
+    load: () => import('./poncelet/index.js'),
+  },
 ];
