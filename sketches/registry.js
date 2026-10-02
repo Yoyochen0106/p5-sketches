@@ -48,4 +48,10 @@ export const SKETCHES = [
     description: 'Contours and isosurfaces of scalar fields: inspect single cells, the 256 cube cases, cracks and slices.',
     load: () => import('./iso/index.js'),
   },
+  {
+    id: 'impulse',
+    title: 'Impulse Response Lab',
+    description: 'Draw an input and an output like a terrain and recover the impulse response h with y = x * h, in time and frequency.',
+    load: () => import('./impulse/index.js'),
+  },
 ];

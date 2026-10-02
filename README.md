@@ -29,6 +29,7 @@ npm test               # node --test "tests/**/*.test.js"  (no browser needed)
 | `#/conformal` | Conformal Maps (grids and angles under complex maps) |
 | `#/monge` | Monge's Theorem (three draggable circles) |
 | `#/equal-area` | Equal-Area Transformations (shear, polygon reduction, squaring) |
+| `#/impulse` | Impulse Response Lab (draw input/output, recover h = deconvolution, time + frequency views) |
 | `#/hello` | Demo of the sketch API |
 
 Shortcuts: `d` toggles the settings drawer.
