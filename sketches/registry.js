@@ -36,4 +36,10 @@ export const SKETCHES = [
     description: 'Grids, angles and local magnification under complex maps: z\u00b2, exp, sin, Joukowski, M\u00f6bius, polynomials.',
     load: () => import('./conformal/index.js'),
   },
+  {
+    id: 'chladni',
+    title: 'Chladni Plates',
+    description: 'Vibrating square, rectangular and circular plates: eigenmodes, mode mixing, driven resonance sweeps, nodal lines and sand.',
+    load: () => import('./chladni/index.js'),
+  },
 ];
