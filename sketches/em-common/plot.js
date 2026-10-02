@@ -125,8 +125,9 @@ export function textBlock(p, pal, lines, x, y, w, lineH = 15) {
   for (const ln of lines) {
     const t = typeof ln === 'string' ? ln : ln.text;
     p.fill(typeof ln === 'string' ? pal.fg : ln.color || pal.fg);
-    p.text(t, x, yy);
-    yy += lineH;
+    const rows = Math.max(1, Math.ceil(p.textWidth(t) / Math.max(40, w)));
+    if (rows > 1) p.text(t, x, yy, w); else p.text(t, x, yy);
+    yy += rows * lineH;
   }
   return yy;
 }
