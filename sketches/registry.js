@@ -260,7 +260,7 @@ export const SKETCHES = [
     unit: 6,
     title: 'Complex Integration & Residues',
     description: "Contour integrals, Cauchy's theorem and the residue theorem, with poles, branch cuts and real-integral evaluation.",
-    planned: true,
+    load: () => import('./ma-residue/index.js'),
     prereqs: ['ma-laplace'],
     related: [
       { id: 'conformal', label: 'Conformal maps', why: 'Complex maps as geometry' },
