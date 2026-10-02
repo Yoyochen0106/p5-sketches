@@ -18,4 +18,10 @@ export const SKETCHES = [
     description: 'Drag three circles: the intersection points of their external common tangents always lie on one line.',
     load: () => import('./monge/index.js'),
   },
+  {
+    id: 'fourier2d',
+    title: 'Fourier Painter',
+    description: 'Draw a curve and watch epicycles fit it, or paint an image and keep only some 2D frequencies.',
+    load: () => import('./fourier2d/index.js'),
+  },
 ];
