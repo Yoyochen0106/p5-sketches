@@ -5,9 +5,12 @@ import { FUNCTIONS, getFunction } from '../../lib/functions.js';
 import { CONTINUOUS } from '../../lib/wavelets/cwt.js';
 import { Viewport } from './view.js';
 import { getPalette } from './palette.js';
-import { DEFAULTS } from './state.js';
-import { METHODS, METHOD_BY_ID, waveletFamilyOptions } from './methods.js';
-import { drawRealPanel, splitReal } from './real.js';
+import { DEFAULTS, AUDIO_TRACKS } from './state.js';
+import { NODE_FAMILIES } from '../../lib/interp.js';
+import { WINDOWS } from '../../lib/fourier-windows.js';
+import { createAudioEngine, listenWindow, MIN_FREQ, MAX_FREQ } from './audio.js';
+import { METHODS, METHOD_BY_ID, INTERP_MAX_N, waveletFamilyOptions } from './methods.js';
+import { drawRealPanel, splitReal, gibbsGaugeRect, gaugeValue } from './real.js';
 import { drawComplexPanel, COMPLEX_SOURCES, resetSlots } from './complex.js';
 import { makeCustom, estimateRadius } from './custom.js';
 
@@ -38,7 +41,7 @@ async function loadExpressionParser() {
     }
 }
 
-function buildSchema(parseExpression) {
+function buildSchema(parseExpression, audio) {
     const funcOptions = FUNCTIONS.map((f) => ({ value: f.id, label: f.label }));
     if (parseExpression) funcOptions.push({ value: 'custom', label: 'custom expression…' });
     const sourceOptions = COMPLEX_SOURCES.map((s) => ({ value: s.value, label: s.label }));
@@ -81,6 +84,29 @@ function buildSchema(parseExpression) {
                     type: 'slider', key: 'fourier.period', label: 'period (0 = auto)', min: 0, max: 20, step: 0.05,
                     format: (v) => (v > 0 ? v.toFixed(2) : 'auto'),
                 },
+                {
+                    type: 'select', key: 'fourier.window', label: 'summation window (Gibbs)',
+                    options: WINDOWS.map((w) => ({ value: w.id, label: w.label })),
+                },
+                { type: 'toggle', key: 'fourier.gibbs', label: 'overshoot read-out + N gauge (square / saw / step)' },
+            ],
+        },
+        {
+            type: 'group', label: 'Polynomial interpolation', enabledKey: 'interp.on', children: [
+                { type: 'slider', key: 'interp.n', label: 'degree n', min: 0, max: INTERP_MAX_N, step: 1 },
+                {
+                    type: 'select', key: 'interp.family', label: 'nodes',
+                    options: NODE_FAMILIES.map((f) => ({ value: f.id, label: f.label })),
+                },
+                {
+                    type: 'select', key: 'interp.window', label: 'window',
+                    options: [{ value: 'view', label: 'visible x range' }, { value: 'center', label: 'a ± W' }],
+                },
+                {
+                    type: 'slider', key: 'interp.W', label: 'half-width W', min: 0.1, max: 10, step: 0.1,
+                    visibleIf: (s) => s.get('interp.window') === 'center',
+                },
+                { type: 'toggle', key: 'interp.compare', label: 'compare with Chebyshev (dashed)' },
             ],
         },
         {
@@ -112,6 +138,35 @@ function buildSchema(parseExpression) {
             ],
         },
         {
+            type: 'group', label: 'Listen', collapsed: true, children: [
+                {
+                    type: 'info', text: 'Web Audio is not available (or was blocked) in this browser, so there is no sound.',
+                    visibleIf: () => !audio.available,
+                },
+                { type: 'toggle', key: 'audio.playing', label: 'play / stop (P)' },
+                {
+                    type: 'slider', key: 'audio.freq', label: 'fundamental', min: MIN_FREQ, max: MAX_FREQ, step: 1,
+                    format: (v) => `${Math.round(v)} Hz`,
+                },
+                { type: 'slider', key: 'audio.volume', label: 'volume', min: 0, max: 1, step: 0.01 },
+                { type: 'toggle', key: 'audio.original', label: 'include the original f' },
+                ...AUDIO_TRACKS.flatMap((id) => {
+                    const name = id === 'original' ? 'f' : METHOD_BY_ID[id].name;
+                    const vis = (s) => !!s.get(id === 'original' ? 'audio.original' : `${id}.on`);
+                    return [
+                        { type: 'toggle', key: `audio.mute.${id}`, label: `mute ${name}`, visibleIf: vis },
+                        { type: 'toggle', key: `audio.solo.${id}`, label: `solo ${name}`, visibleIf: vis },
+                    ];
+                }),
+                {
+                    type: 'info',
+                    text: 'One period of every enabled approximation loops as a waveform (peak-normalised, DC removed). '
+                        + 'The period is the Fourier period if Fourier is on, else the function period; for a non-periodic '
+                        + 'function it is the visible x range (the loop point may click).',
+                },
+            ],
+        },
+        {
             type: 'group', label: 'Display', children: [
                 { type: 'toggle', key: 'showGrid', label: 'grid' },
                 { type: 'toggle', key: 'showError', label: 'error strip' },
@@ -122,7 +177,9 @@ function buildSchema(parseExpression) {
         {
             type: 'info',
             text: 'Hover: move expansion point a · click: lock/unlock · drag: pan · wheel: zoom (shift = y, alt = x) · '
-                + '↑↓ / W S: Taylor order · 1 2 3: panels · space: animate · F: fit · M: next complex view',
+                + '↑↓ / W S: Taylor order · 1 2 3: panels · space: animate · F: fit · M: next complex view · '
+                + 'P: play / stop sound · drag the N gauge (square / saw / step with Fourier on) to watch the Gibbs overshoot · '
+                + 'interpolation: try 1/(1+25x²) with equispaced vs Chebyshev nodes (Runge phenomenon)',
         },
     ];
 }
@@ -149,6 +206,9 @@ export default {
         const store = withDefaults(ctx.settings);
         const cleanups = [];
         resetSlots();
+        const engine = createAudioEngine();
+        cleanups.push(() => engine.dispose());
+        store.set('audio.playing', false); // playback always needs a fresh user gesture
 
         // ---------- state ----------
         let func = resolveFunction(store, parseExpression) || FUNCTIONS[0];
@@ -166,6 +226,9 @@ export default {
             funcError: null,
             keyHold: null,
             errRect: null,
+            audioSig: '',
+            audioAt: 0,
+            audioPending: false,
             disposed: false,
         };
         let doResize = () => {};
@@ -245,7 +308,11 @@ export default {
                     let part = '';
                     if (base === 'taylor') part = `${A}|${get('taylor.order')}`;
                     else if (base === 'pade') part = `${A}|${get('pade.L')},${get('pade.M')}`;
-                    else if (base === 'fourier') part = `${get('fourier.N')},${get('fourier.period')}`;
+                    else if (base === 'fourier') part = `${get('fourier.N')},${get('fourier.period')},${get('fourier.window')}`;
+                    else if (base === 'interp') {
+                        const f = scene.fit('interp');
+                        part = f ? `${get('interp.n')},${get('interp.family')},${f.window.join(',')}` : 'none';
+                    }
                     return `${func.id}|${func.expr || ''}|${part}`;
                                 },
             };
@@ -258,6 +325,71 @@ export default {
                 }
             }
             return scene;
+        }
+
+        // ---------- audio ----------
+        /** Track list (original f + enabled fits) over one period; rebuilt only when its signature changes. */
+        function audioTracks(scene) {
+            const win = listenWindow({ fourierFit: scene.fits.fourier, func, view: scene.env.view });
+            const tracks = [];
+            const at = (g) => (ph) => g(win.x0 + ph * win.T);
+            if (get('audio.original')) tracks.push({ id: 'original', fn: at(func.f) });
+            for (const m of METHODS) {
+                const f = scene.fits[m.id];
+                if (f) tracks.push({ id: m.id, fn: at(f.real) });
+            }
+            const sig = [func.id, func.expr || '', win.kind, win.x0, win.T,
+                st.a[0].toFixed(3), st.a[1].toFixed(3),
+                ...tracks.map((t) => `${t.id}:${scene.fits[t.id] ? scene.fits[t.id].info : ''}:${(scene.fits[t.id] && scene.fits[t.id].window) || ''}`),
+            ].join('|');
+            return { tracks, sig };
+        }
+
+        function audioParams() {
+            const mute = {};
+            const solo = {};
+            for (const id of AUDIO_TRACKS) {
+                mute[id] = !!get(`audio.mute.${id}`);
+                solo[id] = !!get(`audio.solo.${id}`);
+            }
+            return { freq: get('audio.freq'), volume: get('audio.volume'), mute, solo };
+        }
+
+        /** Push the current tracks to the engine (throttled to ~8/s while the inputs keep changing). */
+        function syncTracks(scene, force = false) {
+            if (st.disposed || !engine.playing) return;
+            const { tracks, sig } = audioTracks(scene);
+            if (sig === st.audioSig && !force) {
+                st.audioPending = false;
+                return;
+            }
+            const t = Date.now();
+            if (!force && t - st.audioAt < 120) {
+                st.audioPending = true;
+                return;
+            }
+            st.audioAt = t;
+            st.audioSig = sig;
+            st.audioPending = false;
+            engine.setTracks(tracks);
+        }
+
+        /** Reacts to store changes: start / stop (inside the user's click), parameters, mute / solo. */
+        function onStoreChange() {
+            st.dirty = true;
+            if (st.disposed) return;
+            const want = !!get('audio.playing');
+            if (want && !engine.playing) {
+                const { tracks, sig } = audioTracks(buildScene(getPalette(ctx.globalSettings.get('theme', 'dark'))));
+                st.audioSig = sig;
+                engine.setTracks(tracks);
+                engine.setParams(audioParams());
+                if (!engine.play()) store.set('audio.playing', false);
+            } else if (!want && engine.playing) {
+                engine.stop();
+            } else {
+                engine.setParams(audioParams());
+            }
         }
 
         // ---------- layout ----------
@@ -328,14 +460,28 @@ export default {
 
             function pressStart(e) {
                 if (!onCanvas(e) || p.mouseButton === p.RIGHT || p.mouseButton === p.CENTER) return false;
+                const g = st.gauge;
+                if (g && p.mouseX >= g.x - 8 && p.mouseX <= g.x + g.w + 8 && p.mouseY >= g.y - 4 && p.mouseY <= g.y + g.h + 4) {
+                    st.press = { hit: 'gauge', x: p.mouseX, y: p.mouseY, moved: true };
+                    setGauge();
+                    return true;
+                }
                 const hit = hitPanel(p.mouseX, p.mouseY);
                 st.press = hit ? { hit, x: p.mouseX, y: p.mouseY, moved: false } : null;
                 return !!st.press;
             }
 
+            function setGauge() {
+                if (st.gauge) store.set('fourier.N', Math.min(128, gaugeValue(st.gauge, p.mouseX)));
+            }
+
             function pressDrag() {
                 const pr = st.press;
                 if (!pr) return;
+                if (pr.hit === 'gauge') {
+                    setGauge();
+                    return;
+                }
                 if (Math.hypot(p.mouseX - pr.x, p.mouseY - pr.y) > 4) pr.moved = true;
                 if (!pr.moved) return;
                 const dx = p.mouseX - p.pmouseX;
@@ -435,6 +581,7 @@ export default {
                 else if (k === 'g' || k === 'G') store.set('showGrid', !get('showGrid'));
                 else if (k === 'e' || k === 'E') store.set('showError', !get('showError'));
                 else if (k === 'm' || k === 'M') cycleSource();
+                else if (k === 'p' || k === 'P') store.set('audio.playing', !get('audio.playing'));
                 else return true;
                 return false;
             };
@@ -477,6 +624,7 @@ export default {
                 if (st.disposed) return;
                 tickKeyHold();
                 tickAnimation();
+                if (st.audioPending && Date.now() - st.audioAt >= 120) st.dirty = true;
                 if (!st.dirty) return;
                 st.dirty = false;
                 st.errors = {};
@@ -486,6 +634,8 @@ export default {
                 p.background(pal.bg);
 
                 const scene = buildScene(pal);
+                syncTracks(scene);
+                st.gauge = st.layout.real ? gibbsGaugeRect(scene, realView.rect) : null;
                 if (st.layout.real) drawRealPanel(p, scene, realView, st.errRect);
                 if (st.layout.cplx) drawComplexPanel(p, scene, cplxView, realView);
                 drawStatus(p, pal);
@@ -511,12 +661,12 @@ export default {
         };
 
         const instance = new ctx.p5(sketch, container);
-        cleanups.push(store.subscribe(() => { st.dirty = true; }));
+        cleanups.push(store.subscribe(onStoreChange));
         cleanups.push(ctx.onResize(() => doResize()));
 
         // ---------- UI ----------
         const modeTabs = ctx.ui.build([{ type: 'tabs', key: 'mode', options: MODES }], store, ctx.toolbar);
-        const panel = ctx.ui.build(buildSchema(parseExpression), store, ctx.drawer);
+        const panel = ctx.ui.build(buildSchema(parseExpression, engine), store, ctx.drawer);
 
         return {
             unmount() {

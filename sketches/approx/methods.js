@@ -6,6 +6,8 @@
 import { hornerReal, hornerComplex } from '../../lib/poly.js';
 import { pade, evalRational, evalRationalReal, poles, zeros } from '../../lib/pade.js';
 import { fourierFit, fourierPartial } from '../../lib/fourier.js';
+import { applyWindow, measureOvershoot, JUMP_POINTS } from '../../lib/fourier-windows.js';
+import { interpolate, maxError, lebesgueConstant } from '../../lib/interp.js';
 import { FAMILIES, getFamily } from '../../lib/wavelets/families.js';
 import { waveletApprox, waveletFunction } from '../../lib/wavelets/dwt.js';
 import { METHOD_COLORS } from './palette.js';
@@ -93,6 +95,16 @@ export function fourierPeriod(env) {
     return 2 * Math.PI;
 }
 
+/** Measured overshoot at the first jump of f (square / saw / step) for the displayed (possibly windowed) sum. */
+function fourierGibbs(env, part, period, N, win) {
+    const { func, cache } = env;
+    const xj = JUMP_POINTS[func.id];
+    if (xj === undefined) return null;
+    const reach = Math.min(period, func.period || period) / 4;
+    const o = memo(cache, `gb|${func.id}|${period}|${N}|${win}`, () => measureOvershoot(part.evalReal, func.f, xj, reach));
+    return o ? { ...o, xj, reach } : null;
+}
+
 export const fourier = {
     id: 'fourier',
     name: 'Fourier',
@@ -105,14 +117,68 @@ export const fourier = {
         const full = memo(cache, `ff|${func.id}|${period}`, () =>
             fourierFit(func.f, { period, x0, N: FOURIER_MAX_N, samples: 4096 }));
         const N = Math.min(env.get('fourier.N'), FOURIER_MAX_N);
-        const part = fourierPartial(full, N);
+        const win = env.get('fourier.window') || 'none';
+        const plain = fourierPartial(full, N);
+        const part = win === 'none' ? plain : applyWindow(plain, win);
+        const gibbs = fourierGibbs(env, part, period, N, win);
         return {
-            info: `Fourier  N=${N}  T=${+period.toPrecision(4)}`,
+            info: `Fourier  N=${N}  T=${+period.toPrecision(4)}${win === 'none' ? '' : `  ${win}`}`,
+            lines: gibbs ? [`overshoot ${(gibbs.overshoot * 100).toFixed(2)}% of jump  (plain Gibbs 8.95%)`] : [],
+            gibbs,
+            window: win,
             fit: part,
             period,
             x0,
             real: (x) => part.evalReal(x),
             complex: (z) => part.evalComplex(z),
+        };
+    },
+};
+
+export const INTERP_MAX_N = 80;
+
+/** Interpolation window: the (quantised) visible x range, or [a - W, a + W] around the expansion point. */
+export function interpWindow(env) {
+    if (env.get('interp.window') === 'center') {
+        const W = Math.max(1e-6, env.get('interp.W'));
+        return [env.a[0] - W, env.a[0] + W];
+    }
+    const span = Math.max(1e-9, env.view.x1 - env.view.x0);
+    const step = span / 16;
+    const lo = quantize(env.view.x0, step);
+    let hi = quantize(env.view.x1, step);
+    if (!(hi > lo)) hi = lo + step;
+    return [lo, hi];
+}
+
+export const interp = {
+    id: 'interp',
+    name: 'Interpolation',
+    color: METHOD_COLORS.interp,
+    needsAnalytic: false,
+    fit(env) {
+        const { func, cache } = env;
+        const n = Math.min(INTERP_MAX_N, Math.max(0, Math.round(env.get('interp.n'))));
+        const family = env.get('interp.family');
+        const [lo, hi] = interpWindow(env);
+        const build = (fam) => memo(cache, `if|${func.id}|${fam}|${n}|${lo}|${hi}`, () => {
+            const p = interpolate(func.f, { family: fam, n, a: lo, b: hi });
+            return { p, err: maxError(func.f, p, lo, hi), leb: lebesgueConstant(p) };
+        });
+        const r = build(family);
+        const cmp = env.get('interp.compare') && family !== 'chebyshev' ? build('chebyshev') : null;
+        const fmtErr = Number.isFinite(r.err) ? r.err.toExponential(2) : '?';
+        return {
+            info: `Interpolation  n=${n}  ${family}`,
+            lines: [`max |f−p| = ${fmtErr} on [${+lo.toPrecision(3)}, ${+hi.toPrecision(3)}]   Λ ≈ ${r.leb < 1e4 ? r.leb.toFixed(2) : r.leb.toExponential(2)}`],
+            interpolant: r.p,
+            nodes: r.p.xs.map((x, i) => [x, r.p.fs[i]]),
+            window: [lo, hi],
+            maxErr: r.err,
+            lebesgue: r.leb,
+            compare: cmp ? { real: (x) => cmp.p.evalReal(x) } : null,
+            real: (x) => r.p.evalReal(x),
+            complex: (z) => r.p.evalComplex(z),
         };
     },
 };
@@ -168,5 +234,5 @@ export function motherWavelet(env) {
     return memo(env.cache, `mw|${family.id}`, () => ({ family, ...waveletFunction(family, { iterations: 8 }) }));
 }
 
-export const METHODS = [taylor, padeMethod, fourier, wavelet];
+export const METHODS = [taylor, padeMethod, fourier, wavelet, interp];
 export const METHOD_BY_ID = Object.fromEntries(METHODS.map((m) => [m.id, m]));

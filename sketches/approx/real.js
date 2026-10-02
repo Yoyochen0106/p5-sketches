@@ -150,11 +150,12 @@ function drawReadout(p, scene, rect) {
             tw.type(`R ${Number.isFinite(R) ? '= ' + R.toFixed(3) : '= ∞'}`).newline();
         }
     }
-    for (const m of ['pade', 'fourier', 'wavelet']) {
+    for (const m of ['pade', 'fourier', 'wavelet', 'interp']) {
         const f = fits[m];
         if (!f) continue;
         p.fill(f.color);
         tw.type(f.info).newline();
+        for (const line of f.lines || []) tw.type(`  ${line}`).newline();
     }
 }
 
@@ -187,6 +188,79 @@ function drawRadiusBand(p, scene, vp) {
     p.strokeWeight(1);
     if (x0 > r.x) p.line(x0, r.y, x0, r.y + r.h);
     if (x1 < r.x + r.w) p.line(x1, r.y, x1, r.y + r.h);
+}
+
+/** Interpolation nodes as dots lying on f. */
+function drawNodes(p, scene, vp) {
+    const it = scene.fits.interp;
+    if (!it) return;
+    const [r, g, b] = hexToRgb(it.color);
+    p.stroke(scene.pal.panel);
+    p.strokeWeight(1);
+    p.fill(r, g, b);
+    for (const [x, y] of it.nodes) {
+        const px = vp.toX(x);
+        const py = vp.toY(y);
+        if (Number.isFinite(px) && Number.isFinite(py)) p.circle(px, py, 7);
+    }
+}
+
+/** Dashed line at the theoretical Gibbs peak (plateau + 8.95 % of the jump) next to the jump. */
+function drawGibbsLine(p, scene, vp) {
+    const fo = scene.fits.fourier;
+    if (!fo || !fo.gibbs || !scene.get('fourier.gibbs')) return;
+    const { xj, reach, level } = fo.gibbs;
+    const y = vp.toY(level);
+    if (!Number.isFinite(y)) return;
+    const [r, g, b] = hexToRgb(fo.color);
+    p.stroke(r, g, b, 190);
+    p.strokeWeight(1);
+    const ctx = p.drawingContext;
+    if (ctx && ctx.setLineDash) ctx.setLineDash([5, 4]);
+    p.line(vp.toX(xj - reach), y, vp.toX(xj + reach), y);
+    if (ctx && ctx.setLineDash) ctx.setLineDash([]);
+    p.noStroke();
+    p.fill(r, g, b);
+    p.textFont(FONT);
+    p.textSize(10);
+    p.textAlign(p.LEFT, p.BOTTOM);
+    p.text('Gibbs 8.95 %', vp.toX(xj + reach) + 4, y - 2);
+}
+
+/** Rectangle of the N gauge (bottom-left of the plot), or null when it is not shown. */
+export function gibbsGaugeRect(scene, rect) {
+    const fo = scene.fits.fourier;
+    if (!fo || !fo.gibbs || !scene.get('fourier.gibbs') || rect.h < 120 || rect.w < 200) return null;
+    return { x: rect.x + 10, y: rect.y + rect.h - 34, w: Math.min(240, rect.w * 0.45), h: 14 };
+}
+
+export const GAUGE_MAX_N = 128;
+
+/** Map a mouse x on the gauge to a harmonic count N. */
+export function gaugeValue(g, mx) {
+    return Math.round(Math.max(0, Math.min(1, (mx - g.x) / g.w)) * GAUGE_MAX_N);
+}
+
+/** A slider-like gauge marking the current N (click or drag to change it). */
+function drawGibbsGauge(p, scene, rect) {
+    const g = gibbsGaugeRect(scene, rect);
+    if (!g) return;
+    const fo = scene.fits.fourier;
+    const [r, gg, b] = hexToRgb(fo.color);
+    const x = g.x + (Math.min(fo.fit.N, GAUGE_MAX_N) / GAUGE_MAX_N) * g.w;
+    p.noStroke();
+    p.fill(scene.pal.grid);
+    p.rect(g.x, g.y + g.h / 2 - 2, g.w, 4, 2);
+    p.fill(r, gg, b);
+    p.rect(g.x, g.y + g.h / 2 - 2, x - g.x, 4, 2);
+    p.stroke(scene.pal.panel);
+    p.circle(x, g.y + g.h / 2, 12);
+    p.noStroke();
+    p.fill(scene.pal.muted);
+    p.textFont(FONT);
+    p.textSize(10);
+    p.textAlign(p.LEFT, p.BOTTOM);
+    p.text(`N = ${fo.fit.N}  (drag)   overshoot ${(fo.gibbs.overshoot * 100).toFixed(2)} %`, g.x, g.y - 2);
 }
 
 function drawMotherInset(p, scene, rect) {
@@ -240,7 +314,7 @@ function drawErrorStrip(p, scene, vp, rect) {
         p.strokeWeight(1);
         p.stroke(pal.grid);
         for (let e = -16; e <= 2; e += 4) p.line(rect.x, ev.toY(e), rect.x + rect.w, ev.toY(e));
-        for (const m of ['taylor', 'pade', 'fourier', 'wavelet']) {
+        for (const m of ['taylor', 'pade', 'fourier', 'wavelet', 'interp']) {
             const f = fits[m];
             if (!f) continue;
             plotCurve(p, ev, (x) => Math.log10(Math.abs(func.f(x) - f.real(x)) + 1e-17), { color: f.color, weight: 1.5 });
@@ -292,13 +366,18 @@ export function drawRealPanel(p, scene, vp, errRect = null) {
             }
         }
         plotCurve(p, vp, func.f, { color: pal.fg, weight: 2 });
-        for (const m of ['wavelet', 'fourier', 'pade', 'taylor']) {
+        const cmp = fits.interp && fits.interp.compare;
+        if (cmp) plotCurve(p, vp, cmp.real, { color: pal.muted, weight: 1.3, dash: [5, 4] });
+        for (const m of ['wavelet', 'fourier', 'pade', 'taylor', 'interp']) {
             const f = fits[m];
             if (f) plotCurve(p, vp, f.real, { color: f.color, weight: 2.2 });
         }
+        drawGibbsLine(p, scene, vp);
+        drawNodes(p, scene, vp);
         drawCenterMarker(p, scene, vp);
     });
     drawReadout(p, scene, main);
+    drawGibbsGauge(p, scene, main);
     drawMotherInset(p, scene, main);
     p.noFill();
     p.stroke(pal.border);

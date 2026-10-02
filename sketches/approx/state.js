@@ -21,6 +21,8 @@ export const DEFAULTS = {
     'fourier.on': false,
     'fourier.N': 5,
     'fourier.period': 0,    // 0 = automatic
+    'fourier.window': 'none', // summation window (lib/fourier-windows.js)
+    'fourier.gibbs': true,  // overshoot read-out + N gauge for functions with a jump
 
     'wavelet.on': false,
     'wavelet.family': 'db4',
@@ -28,6 +30,18 @@ export const DEFAULTS = {
     'wavelet.keepPct': 100,
     'wavelet.samples': 1024,
     'wavelet.mother': true,
+
+    'interp.on': false,
+    'interp.n': 10,
+    'interp.family': 'chebyshev',
+    'interp.window': 'view', // 'view' = the visible x range, 'center' = [a - W, a + W]
+    'interp.W': 1,
+    'interp.compare': false, // dashed Chebyshev interpolant of the same degree for comparison
+
+    'audio.playing': false, // never restored as true: playback needs a user gesture
+    'audio.freq': 220,
+    'audio.volume': 0.4,
+    'audio.original': false,
 
     'cplx.source': 'taylor',
     'cplx.cwt': 'morlet',
@@ -38,6 +52,13 @@ export const DEFAULTS = {
     lockRe: 0,
     lockIm: 0,
 };
+
+// Listen section: per-track mute / solo flags ('original' = f itself, then every method id).
+export const AUDIO_TRACKS = ['original', 'taylor', 'pade', 'fourier', 'wavelet', 'interp'];
+for (const id of AUDIO_TRACKS) {
+    DEFAULTS[`audio.mute.${id}`] = false;
+    DEFAULTS[`audio.solo.${id}`] = false;
+}
 
 export function hexToRgb(hex) {
     const h = hex.replace('#', '');

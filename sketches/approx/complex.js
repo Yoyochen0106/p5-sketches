@@ -14,9 +14,11 @@ export const COMPLEX_SOURCES = [
     { value: 'taylor', label: 'Taylor Tₙ(z)', needs: 'analytic' },
     { value: 'pade', label: 'Padé [L/M](z)', needs: 'analytic' },
     { value: 'fourier', label: 'Fourier Sₙ(z)', needs: 'fit' },
+    { value: 'interp', label: 'Interpolant pₙ(z)', needs: 'fit' },
     { value: 'err-taylor', label: 'error: Taylor', needs: 'analytic' },
     { value: 'err-pade', label: 'error: Padé', needs: 'analytic' },
     { value: 'err-fourier', label: 'error: Fourier', needs: 'analytic' },
+    { value: 'err-interp', label: 'error: Interpolant', needs: 'analytic' },
     { value: 'scalogram', label: 'wavelet: scalogram (CWT)', needs: 'real' },
     { value: 'dwtmap', label: 'wavelet: DWT coefficient map', needs: 'real' },
 ];
