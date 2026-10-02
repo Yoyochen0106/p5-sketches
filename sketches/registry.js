@@ -61,6 +61,12 @@ export const SKETCHES = [
     load: () => import('./poncelet/index.js'),
   },
   {
+    id: 'geodesics',
+    title: 'Surface Curvature & Geodesics',
+    description: 'Curvature of parametric surfaces, geodesics and shortest paths, parallel transport, holonomy and Gauss-Bonnet.',
+    load: () => import('./geodesics/index.js'),
+  },
+  {
     id: 'elliptic',
     title: 'Elliptic Curve Group',
     description: 'Chord-and-tangent addition on y\u00b2 = x\u00b3 + ax + b over the reals, over finite fields F_p, and via the complex torus C/(Z + \u03c4Z).',
