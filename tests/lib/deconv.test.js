@@ -180,3 +180,12 @@ test('minimum-phase / linear-phase reconstruction from magnitude', () => {
     assert.ok(maxErr(a.mag, mag) < 1e-9);
     assert.ok(Math.abs(a.delay[3] - M / 2) < 1e-6);
 });
+
+test('rank-deficient input (leading zeros) gives a finite solution that still fits', () => {
+    const x = randSig(64, 14); x[0] = 0; x[1] = 0;
+    const h = lowpass(64, 0.8);
+    const y = convolveTruncated(x, h, 64);
+    const est = leastSquaresDeconvolve(y, x, { L: 64, lambda: 0 });
+    assert.ok(est.every(Number.isFinite));
+    assert.ok(residualNorm(x, est, y) < 1e-6);
+});
