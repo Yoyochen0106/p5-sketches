@@ -14,6 +14,7 @@ export const METHOD_COLORS = {
     pade: '#ff9f43',
     fourier: '#2ecc71',
     wavelet: '#c77dff',
+    interp: '#ff5fa2',
 };
 
 /** Resolve 'dark' | 'light' | 'auto' into a palette. */
