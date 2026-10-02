@@ -162,7 +162,7 @@ export const SKETCHES = [
     unit: 5,
     title: 'Transmission Lines & the Smith Chart',
     description: 'Standing waves, reflection coefficient and impedance matching on a line, visualised on the Smith chart.',
-    planned: true,
+    load: () => import('./em-tline/index.js'),
     prereqs: ['em-fdtd'],
     related: [
       { id: 'conformal', label: 'Conformal maps', why: 'The Smith chart is a Moebius transform of the impedance plane' },
@@ -176,7 +176,7 @@ export const SKETCHES = [
     unit: 6,
     title: 'Antenna Arrays & Radiation Patterns',
     description: 'Array factor, beam steering, grating lobes and polar radiation patterns of linear and planar antenna arrays.',
-    planned: true,
+    load: () => import('./em-antenna/index.js'),
     prereqs: ['em-fdtd'],
     related: [
       { id: 'fourier2d', label: 'Fourier painter', why: 'The array factor is the Fourier transform of the element weights' },
