@@ -72,4 +72,10 @@ export const SKETCHES = [
     description: 'Chord-and-tangent addition on y\u00b2 = x\u00b3 + ax + b over the reals, over finite fields F_p, and via the complex torus C/(Z + \u03c4Z).',
     load: () => import('./elliptic/index.js'),
   },
+  {
+    id: 'kleinian',
+    title: 'Iterated Function Systems & Moebius Groups',
+    description: 'Affine IFS fractals by the chaos game, and Schottky / Kleinian group limit sets on the plane and the Riemann sphere.',
+    load: () => import('./kleinian/index.js'),
+  },
 ];

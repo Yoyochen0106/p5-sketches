@@ -30,6 +30,10 @@ npm test               # node --test "tests/**/*.test.js"  (no browser needed)
 | `#/monge` | Monge's Theorem (three draggable circles) |
 | `#/equal-area` | Equal-Area Transformations (shear, polygon reduction, squaring) |
 | `#/impulse` | Impulse Response Lab (draw input/output, recover h = deconvolution, time + frequency views) |
+| `#/poncelet` | Poncelet's Porism (two conics, closing tangent polygons, Cayley / Euler criteria, closure solver) |
+| `#/geodesics` | Surface Curvature & Geodesics (K / H colouring, geodesics, parallel transport, holonomy, Gauss-Bonnet) |
+| `#/elliptic` | Elliptic Curve Group (chord-and-tangent over R, over F_p, and on the complex torus) |
+| `#/kleinian` | IFS & Moebius Groups (chaos game fractals, Schottky / Kleinian limit sets, Riemann sphere) |
 | `#/hello` | Demo of the sketch API |
 
 Shortcuts: `d` toggles the settings drawer.
