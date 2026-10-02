@@ -232,7 +232,7 @@ export const SKETCHES = [
     unit: 4,
     title: 'Vector Calculus: Divergence, Curl, Green & Stokes',
     description: "Vector fields with live divergence and curl, line and flux integrals, and numeric checks of Green's and Stokes' theorems.",
-    planned: true,
+    load: () => import('./ma-vector/index.js'),
     prereqs: ['ma-linalg'],
     related: [
       { id: 'em-electrostatics', label: 'Electrostatics', why: 'Divergence and flux in Gauss law' },
