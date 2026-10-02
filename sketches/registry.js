@@ -30,4 +30,10 @@ export const SKETCHES = [
     description: 'Slide a vertex parallel to the opposite side: the area never changes. Triangles, polygon reduction and squaring the triangle.',
     load: () => import('./equal-area/index.js'),
   },
+  {
+    id: 'conformal',
+    title: 'Conformal Maps',
+    description: 'Grids, angles and local magnification under complex maps: z\u00b2, exp, sin, Joukowski, M\u00f6bius, polynomials.',
+    load: () => import('./conformal/index.js'),
+  },
 ];
