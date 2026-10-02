@@ -18,11 +18,6 @@ npm test               # node --test "tests/**/*.test.js"  (no browser needed)
 | `lib/` | Pure math, importable from the browser and Node: complex numbers, algebras, truncated power series (automatic differentiation), Pade, Fourier, wavelets, domain colouring. |
 | `tests/` | `node:test` suites plus `tests/mock-p5.js`, a recording fake p5 used to test sketches headlessly. |
 
-## Classic sketch
-
-`classic.html` + `sketch.js` is the original hand-written global-mode Taylor demo (kept as the author's playground,
-not part of the app shell): open `http://localhost:8000/classic.html`.
-
 ## Adding a sketch
 
 1. Create `sketches/<id>/index.js` exporting the object above (`ctx` gives you `p5`, a persisted
