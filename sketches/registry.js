@@ -12,4 +12,10 @@ export const SKETCHES = [
     description: 'Tiny demo sketch exercising settings, the drawer UI, p5 instance mode and unmounting.',
     load: () => import('./hello/index.js'),
   },
+  {
+    id: 'monge',
+    title: "Monge's Theorem",
+    description: 'Drag three circles: the intersection points of their external common tangents always lie on one line.',
+    load: () => import('./monge/index.js'),
+  },
 ];
