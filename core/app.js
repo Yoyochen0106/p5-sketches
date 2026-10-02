@@ -80,7 +80,8 @@ export function createApp(opts = {}) {
       h('main', { class: 'stage' }, container, aside));
     root.appendChild(page);
 
-    let open = globalSettings.get('drawerOpen', true) !== false;
+    const narrow = !!(win.matchMedia && win.matchMedia('(max-width: 640px)').matches);
+    let open = globalSettings.get('drawerOpen', !narrow) !== false;
     const paintDrawer = () => {
       page.classList.toggle('drawer-open', open);
       drawerBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
@@ -91,8 +92,8 @@ export function createApp(opts = {}) {
     drawerBtn.addEventListener('click', () => setOpen(!open));
     fsBtn.addEventListener('click', () => {
       try {
-        if (document.fullscreenElement) document.exitFullscreen();
-        else document.documentElement.requestFullscreen();
+        const r = document.fullscreenElement ? document.exitFullscreen() : document.documentElement.requestFullscreen();
+        if (r && r.catch) r.catch(() => {});
       } catch { /* not supported */ }
     });
     const onKey = (e) => {
@@ -116,6 +117,12 @@ export function createApp(opts = {}) {
       }, resizeDebounce);
     };
     win.addEventListener('resize', onWinResize);
+    // the drawer changes the container size without a window resize
+    let observer = null;
+    if (typeof win.ResizeObserver === 'function') {
+      observer = new win.ResizeObserver(() => onWinResize());
+      observer.observe(container);
+    }
 
     const settings = createStore({
       namespace: `sketch:${entry.id}`, storage, hashSync: createHashSync(win, entry.id),
@@ -128,6 +135,7 @@ export function createApp(opts = {}) {
       tornDown = true;
       document.removeEventListener('keydown', onKey);
       win.removeEventListener('resize', onWinResize);
+      if (observer) { observer.disconnect(); observer = null; }
       if (timer !== null) { clearTimeout(timer); timer = null; }
       resizeFns.clear();
       theme.dispose();

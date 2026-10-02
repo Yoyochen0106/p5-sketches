@@ -7,7 +7,7 @@ import { Viewport } from './view.js';
 import { getPalette } from './palette.js';
 import { DEFAULTS } from './state.js';
 import { METHODS, METHOD_BY_ID, waveletFamilyOptions } from './methods.js';
-import { drawRealPanel } from './real.js';
+import { drawRealPanel, splitReal } from './real.js';
 import { drawComplexPanel, COMPLEX_SOURCES, resetSlots } from './complex.js';
 import { makeCustom, estimateRadius } from './custom.js';
 
@@ -163,14 +163,24 @@ export default {
             layout: { real: null, cplx: null },
             cache: new Map(),
             errors: {},
+            funcError: null,
+            keyHold: null,
+            errRect: null,
+            disposed: false,
         };
+        let doResize = () => {};
         const get = (k) => store.get(k);
 
         function applyLayout(w, h) {
             st.layout = computeLayout(w, h);
             const { real, cplx } = st.layout;
-            if (real) realView.setRect(real.x, real.y, real.w, real.h);
-            if (cplx) cplxView.setRect(cplx.x, cplx.y, cplx.w, cplx.h);
+            st.errRect = null;
+            if (real) {
+                const { main, err } = splitReal(real, get('showError'));
+                realView.setRect(main.x, main.y, main.w, main.h);
+                st.errRect = err;
+            }
+            if (cplx) cplxView.setRect(cplx.x, cplx.y, cplx.w, cplx.h).lockAspect();
         }
 
         function resetViews() {
@@ -188,11 +198,11 @@ export default {
             const f = resolveFunction(store, parseExpression);
             if (f) {
                 func = f;
-                st.errors.func = null;
+                st.funcError = null;
                 st.cache.clear();
                 resetViews();
             } else {
-                st.errors.func = 'Cannot parse expression';
+                st.funcError = 'Cannot parse expression';
             }
         }
 
@@ -228,10 +238,16 @@ export default {
                     }
                     return memoFits[id];
                 },
-                sig() {
-                    return [func.id, func.expr || '', st.a[0].toPrecision(8), st.a[1].toPrecision(8),
-                        get('taylor.order'), get('pade.L'), get('pade.M'), get('fourier.N'), get('fourier.period')].join('|');
-                },
+                /** Cache key of the inputs a complex-panel source actually depends on. */
+                sig(src) {
+                    const A = `${st.a[0].toPrecision(8)},${st.a[1].toPrecision(8)}`;
+                    const base = src.startsWith('err-') ? src.slice(4) : src;
+                    let part = '';
+                    if (base === 'taylor') part = `${A}|${get('taylor.order')}`;
+                    else if (base === 'pade') part = `${A}|${get('pade.L')},${get('pade.M')}`;
+                    else if (base === 'fourier') part = `${get('fourier.N')},${get('fourier.period')}`;
+                    return `${func.id}|${func.expr || ''}|${part}`;
+                                },
             };
             for (const m of METHODS) if (get(`${m.id}.on`)) scene.fits[m.id] = scene.fit(m.id);
             if (func.analytic) {
@@ -267,7 +283,7 @@ export default {
 
         // ---------- p5 sketch ----------
         const sketch = (p) => {
-            let pal = getPalette(ctx.globalSettings.get('theme', 'auto'));
+            let pal = getPalette(ctx.globalSettings.get('theme', 'dark'));
             const markDirty = () => { st.dirty = true; };
 
             function sizeNow() {
@@ -276,6 +292,7 @@ export default {
             }
 
             p.setup = () => {
+                if (st.disposed) return;
                 const { w, h } = sizeNow();
                 p.createCanvas(w, h);
                 applyLayout(w, h);
@@ -302,15 +319,21 @@ export default {
                 return !e || !e.target || !p.canvas || e.target === p.canvas;
             }
 
-            p.mouseMoved = () => setCenterFromMouse();
+            /** Mouse position clamped into the plot area (the error strip belongs to the real panel but has no y scale). */
+            function anchor(hit) {
+                if (hit !== 'real') return [p.mouseX, p.mouseY];
+                const r = realView.rect;
+                return [p.mouseX, Math.min(p.mouseY, r.y + r.h - 1)];
+            }
 
-            p.mousePressed = (e) => {
-                if (!onCanvas(e)) return;
+            function pressStart(e) {
+                if (!onCanvas(e) || p.mouseButton === p.RIGHT || p.mouseButton === p.CENTER) return false;
                 const hit = hitPanel(p.mouseX, p.mouseY);
                 st.press = hit ? { hit, x: p.mouseX, y: p.mouseY, moved: false } : null;
-            };
+                return !!st.press;
+            }
 
-            p.mouseDragged = () => {
+            function pressDrag() {
                 const pr = st.press;
                 if (!pr) return;
                 if (Math.hypot(p.mouseX - pr.x, p.mouseY - pr.y) > 4) pr.moved = true;
@@ -320,9 +343,9 @@ export default {
                 if (pr.hit === 'real') realView.panPx(dx, dy);
                 else cplxView.panPx(dx, dy);
                 st.dirty = true;
-            };
+            }
 
-            p.mouseReleased = () => {
+            function pressEnd() {
                 const pr = st.press;
                 st.press = null;
                 if (!pr || pr.moved) return;
@@ -335,27 +358,47 @@ export default {
                     store.set('lockIm', st.a[1]);
                     store.set('lockOn', true);
                 }
+            }
+
+            p.mouseMoved = (e) => {
+                if (onCanvas(e)) setCenterFromMouse();
             };
+            p.mousePressed = (e) => { pressStart(e); };
+            p.mouseDragged = () => { pressDrag(); };
+            p.mouseReleased = () => { pressEnd(); };
+            p.touchStarted = (e) => (pressStart(e) ? false : true);
+            p.touchMoved = () => { pressDrag(); return !st.press; };
+            p.touchEnded = () => { pressEnd(); return !st.press; };
 
             p.mouseWheel = (e) => {
+                if (!onCanvas(e)) return true;
                 const hit = hitPanel(p.mouseX, p.mouseY);
                 if (!hit) return true;
-                const f = Math.exp((e.delta || 0) * 0.0012);
+                // normalise line / page based wheels (Firefox) to pixels
+                let d = e.delta || 0;
+                if (e.deltaMode === 1) d *= 33;
+                else if (e.deltaMode === 2) d *= 400;
+                d = Math.max(-300, Math.min(300, d));
+                const f = Math.exp(d * 0.0012);
                 const view = hit === 'real' ? realView : cplxView;
                 let fx = f, fy = f;
                 if (hit === 'real') {
                     if (e.shiftKey) fx = 1;
                     else if (e.altKey) fy = 1;
                 }
-                view.zoomAt(p.mouseX, p.mouseY, fx, fy);
+                const [ax, ay] = anchor(hit);
+                view.zoomAt(ax, ay, fx, fy);
                 st.dirty = true;
                 if (e.preventDefault) e.preventDefault();
                 return false;
             };
 
-            function typing() {
+            function typing(k) {
                 const el = globalThis.document && globalThis.document.activeElement;
-                return !!el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || '');
+                if (!el) return false;
+                if (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName || '') || el.isContentEditable) return true;
+                // a focused button / link keeps Space and Enter for itself
+                return /^(BUTTON|A)$/.test(el.tagName || '') && (k === ' ' || k === 'Enter');
             }
 
             function cycleSource() {
@@ -363,13 +406,20 @@ export default {
                 store.set('cplx.source', COMPLEX_SOURCES[(i + 1) % COMPLEX_SOURCES.length].value);
             }
 
-            p.keyPressed = () => {
-                if (typing()) return true;
+            function stepOrder(dir, step) {
+                store.set('taylor.order', Math.max(0, Math.min(40, get('taylor.order') + dir * step)));
+            }
+
+            p.keyPressed = (e) => {
+                if (e && (e.ctrlKey || e.metaKey || e.altKey)) return true; // leave browser shortcuts alone
                 const k = p.key;
+                if (typing(k)) return true;
                 const step = p.keyIsDown && p.keyIsDown(16) ? 5 : 1;
-                if (p.keyCode === p.UP_ARROW) store.set('taylor.order', Math.min(40, get('taylor.order') + step));
-                else if (p.keyCode === p.DOWN_ARROW) store.set('taylor.order', Math.max(0, get('taylor.order') - step));
-                else if (k === '1') store.set('mode', 'real');
+                if (p.keyCode === p.UP_ARROW || p.keyCode === p.DOWN_ARROW) {
+                    const dir = p.keyCode === p.UP_ARROW ? 1 : -1;
+                    stepOrder(dir, step);
+                    st.keyHold = { code: p.keyCode, dir, step, at: Date.now() + 350 };
+                } else if (k === '1') store.set('mode', 'real');
                 else if (k === '2') store.set('mode', 'split');
                 else if (k === '3') store.set('mode', 'complex');
                 else if (k === ' ') store.set('taylor.animate', !get('taylor.animate'));
@@ -387,9 +437,26 @@ export default {
                 return false;
             };
 
-            p.windowResized = () => {
+            // p5 does not auto-repeat keyPressed, so held arrows are handled per frame
+            function tickKeyHold() {
+                const h = st.keyHold;
+                if (!h) return;
+                if (!(p.keyIsDown && p.keyIsDown(h.code))) {
+                    st.keyHold = null;
+                    return;
+                }
+                const now = Date.now();
+                if (now >= h.at) {
+                    stepOrder(h.dir, h.step);
+                    h.at = now + 70;
+                }
+            }
+
+            // driven by ctx.onResize (debounced, also fires when the drawer opens / closes)
+            doResize = () => {
+                if (st.disposed) return;
                 const { w, h } = sizeNow();
-                p.resizeCanvas(w, h);
+                p.resizeCanvas(w, h, true);
                 applyLayout(w, h);
                 st.dirty = true;
             };
@@ -404,22 +471,25 @@ export default {
             }
 
             p.draw = () => {
+                if (st.disposed) return;
+                tickKeyHold();
                 tickAnimation();
                 if (!st.dirty) return;
                 st.dirty = false;
+                st.errors = {};
 
                 refreshFunction();
                 applyLayout(p.width, p.height);
                 p.background(pal.bg);
 
                 const scene = buildScene(pal);
-                if (st.layout.real) drawRealPanel(p, scene, realView);
+                if (st.layout.real) drawRealPanel(p, scene, realView, st.errRect);
                 if (st.layout.cplx) drawComplexPanel(p, scene, cplxView, realView);
                 drawStatus(p, pal);
             };
 
             function drawStatus(pp, palette) {
-                const msgs = Object.values(st.errors).filter(Boolean);
+                const msgs = [st.funcError, ...Object.values(st.errors)].filter(Boolean);
                 if (!msgs.length) return;
                 pp.noStroke();
                 pp.fill('#ff6b6b');
@@ -432,25 +502,22 @@ export default {
 
             // theme / settings changes
             cleanups.push(ctx.globalSettings.subscribe(() => {
-                pal = getPalette(ctx.globalSettings.get('theme', 'auto'));
+                pal = getPalette(ctx.globalSettings.get('theme', 'dark'));
                 markDirty();
             }));
         };
 
         const instance = new ctx.p5(sketch, container);
         cleanups.push(store.subscribe(() => { st.dirty = true; }));
-        cleanups.push(ctx.onResize(() => {
-            if (instance.windowResized) instance.windowResized();
-        }));
+        cleanups.push(ctx.onResize(() => doResize()));
 
         // ---------- UI ----------
         const modeTabs = ctx.ui.build([{ type: 'tabs', key: 'mode', options: MODES }], store, ctx.toolbar);
         const panel = ctx.ui.build(buildSchema(parseExpression), store, ctx.drawer);
-        // keep the Taylor-order key bindings out of the way when the user is typing in the expression box
-        void METHODS;
 
         return {
             unmount() {
+                st.disposed = true;
                 for (const c of cleanups.splice(0)) {
                     try { c(); } catch { /* ignore */ }
                 }

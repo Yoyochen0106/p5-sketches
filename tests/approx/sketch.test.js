@@ -107,3 +107,63 @@ test('unmount removes the p5 instance and is repeatable', async () => {
         m.handle.unmount();
     }
 });
+
+test('browser shortcuts with Ctrl/Meta/Alt are not hijacked', async () => {
+    const { p, handle, settings } = await mountSketch();
+    const before = settings.get('mode', 'split');
+    p.key = '3';
+    p.keyCode = 51;
+    const e = { ctrlKey: true, metaKey: false, altKey: false };
+    const ret = p.keyPressed(e);
+    assert.equal(ret, true, 'handler lets the browser handle it');
+    assert.equal(settings.get('mode', 'split'), before);
+    handle.unmount();
+});
+
+test('wheel zoom is normalised for line-based wheels and clamped', async () => {
+    const { p, handle } = await mountSketch({ mode: 'real', showError: false });
+    p.stepFrames(1);
+    p.moveMouse(600, 300);
+    const zoom = (delta, deltaMode = 0) => {
+        let prevented = false;
+        p.fire('mouseWheel', { delta, deltaMode, preventDefault() { prevented = true; } });
+        p.stepFrames(1);
+        return prevented;
+    };
+    assert.equal(zoom(3, 1), true);
+    for (let i = 0; i < 400; i++) zoom(-300); // zoom in absurdly far
+    p.stepFrames(1);
+    assert.equal(p.invalidCalls.length, 0);
+    handle.unmount();
+});
+
+test('wavelet and scalogram survive a window that reaches a singularity (ln(1+x))', async () => {
+    const m = await mountSketch({ func: 'ln1p', 'wavelet.on': true, 'cplx.source': 'scalogram' });
+    m.p.stepFrames(2);
+    assert.equal(m.p.invalidCalls.length, 0);
+    const m2 = await mountSketch({ func: 'ln1p', 'wavelet.on': true, 'cplx.source': 'dwtmap' });
+    m2.p.stepFrames(2);
+    assert.equal(m2.p.invalidCalls.length, 0);
+    m.handle.unmount();
+    m2.handle.unmount();
+});
+
+test('stale method errors do not persist after the method is turned off', async () => {
+    const { p, handle, settings } = await mountSketch({ func: 'abs', 'taylor.on': true });
+    p.stepFrames(1);
+    settings.set('taylor.on', false);
+    p.stepFrames(1);
+    const texts = p.callsOf('text').map((c) => String(c.args[0]));
+    assert.ok(!texts.some((t) => /Taylor:/.test(t)));
+    handle.unmount();
+});
+
+test('unmounted sketch ignores late draw / resize callbacks', async () => {
+    const { ctx, P5 } = makeCtx();
+    let resizeCb = null;
+    ctx.onResize = (fn) => { resizeCb = fn; return () => {}; };
+    const handle = await approx.mount({}, ctx);
+    const p = P5.instances[0];
+    handle.unmount();
+    assert.doesNotThrow(() => { resizeCb && resizeCb({ width: 300, height: 300 }); p.stepFrames?.(1); });
+});

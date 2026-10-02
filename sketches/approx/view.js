@@ -1,5 +1,8 @@
 // Viewport: maps between math coordinates and a screen rectangle, with zoom / pan helpers.
 
+const MIN_SPAN = 1e-9;
+const MAX_SPAN = 1e9;
+
 export class Viewport {
     constructor(xmin, xmax, ymin, ymax) {
         this.xmin = xmin;
@@ -39,10 +42,11 @@ export class Viewport {
     /** Scale the visible range by (fx, fy) (<1 zooms in) keeping the point under (px, py) fixed. */
     zoomAt(px, py, fx, fy = fx) {
         const cx = this.fromX(px), cy = this.fromY(py);
-        this.xmin = cx + (this.xmin - cx) * fx;
-        this.xmax = cx + (this.xmax - cx) * fx;
-        this.ymin = cy + (this.ymin - cy) * fy;
-        this.ymax = cy + (this.ymax - cy) * fy;
+        const n = [cx + (this.xmin - cx) * fx, cx + (this.xmax - cx) * fx,
+            cy + (this.ymin - cy) * fy, cy + (this.ymax - cy) * fy];
+        const sx = n[1] - n[0], sy = n[3] - n[2];
+        const ok = n.every(Number.isFinite) && sx > MIN_SPAN && sx < MAX_SPAN && sy > MIN_SPAN && sy < MAX_SPAN;
+        if (ok) [this.xmin, this.xmax, this.ymin, this.ymax] = n;
         return this;
     }
 

@@ -66,7 +66,7 @@ class ImageSlot {
     }
 }
 
-const slots = { main: new ImageSlot(), inset: new ImageSlot(), cwt: new ImageSlot() };
+const slots = { main: new ImageSlot(), inset: new ImageSlot(), cwt: new ImageSlot(), dwt: new ImageSlot() };
 
 /** Drop cached images (call when a new p5 instance is mounted). */
 export function resetSlots() {
@@ -154,13 +154,15 @@ function drawOverlays(p, scene, vp, src) {
                 const cy = vp.toY(a[1]);
                 const rx = R * r.w / (vp.xmax - vp.xmin);
                 const ry = R * r.h / (vp.ymax - vp.ymin);
-                p.noFill();
-                p.stroke(255);
-                p.strokeWeight(1.5);
-                const ctx = p.drawingContext;
-                if (ctx && ctx.setLineDash) ctx.setLineDash([6, 5]);
-                p.ellipse(cx, cy, 2 * rx, 2 * ry);
-                if (ctx && ctx.setLineDash) ctx.setLineDash([]);
+                if (rx < 1e5 && ry < 1e5) {
+                    p.noFill();
+                    p.stroke(255);
+                    p.strokeWeight(1.5);
+                    const ctx = p.drawingContext;
+                    if (ctx && ctx.setLineDash) ctx.setLineDash([6, 5]);
+                    p.ellipse(cx, cy, 2 * rx, 2 * ry);
+                    if (ctx && ctx.setLineDash) ctx.setLineDash([]);
+                }
             }
         }
         if (func.analytic) {
@@ -208,13 +210,19 @@ function drawTicks(p, scene, vp) {
 function drawScalogram(p, scene, rect, xr) {
     const wl = getContinuous(scene.get('cplx.cwt'));
     if (!wl) return false;
-    const n = Math.max(64, Math.min(512, Math.round(rect.w / 2)));
+    const n = Math.max(64, Math.min(384, Math.round(rect.w / 2)));
     const nScales = Math.max(24, Math.min(64, Math.round(rect.h / 6)));
+    // quantise the window so small pans reuse the cached transform
+    const q = (xr.x1 - xr.x0) / 16;
+    xr = { x0: Math.round(xr.x0 / q) * q, x1: Math.round(xr.x1 / q) * q };
     const dt = (xr.x1 - xr.x0) / (n - 1);
     const key = ['cwt', scene.func.id, scene.func.expr || '', wl.id, xr.x0, xr.x1, n, nScales].join('|');
     const img = slots.cwt.get(p, key, n, nScales, () => {
         const sig = new Float64Array(n);
-        for (let i = 0; i < n; i++) sig[i] = scene.func.f(xr.x0 + i * dt);
+        for (let i = 0; i < n; i++) {
+            const y = scene.func.f(xr.x0 + i * dt);
+            sig[i] = Number.isFinite(y) ? Math.max(-1e3, Math.min(1e3, y)) : 0;
+        }
         // cwt() scales are measured in samples
         const smin = 2;
         const smax = n / 3;
@@ -223,7 +231,7 @@ function drawScalogram(p, scene, rect, xr) {
         const res = cwt(sig, { wavelet: wl, scales, dt });
         const out = new Uint8ClampedArray(n * nScales * 4);
         let mx = 0;
-        for (let i = 0; i < res.mag.length; i++) mx = Math.max(mx, res.mag[i]);
+        for (let i = 0; i < res.mag.length; i++) if (Number.isFinite(res.mag[i])) mx = Math.max(mx, res.mag[i]);
         for (let s = 0; s < nScales; s++) {
             const row = s; // small scales on top
             for (let i = 0; i < n; i++) {
@@ -256,26 +264,40 @@ function drawDwtMap(p, scene, rect) {
     if (!wv) return false;
     const dec = wv.result.dec;
     const rows = [...dec.details, dec.approx]; // finest detail first, approximation last
-    const rh = rect.h / rows.length;
-    let mx = 0;
-    for (const row of rows) for (const v of row) mx = Math.max(mx, Math.abs(v));
-    p.noStroke();
-    for (let j = 0; j < rows.length; j++) {
-        const row = rows[j];
-        const cw = rect.w / row.length;
-        for (let i = 0; i < row.length; i++) {
-            const v = Math.abs(row[i]);
-            const t = v > 0 && mx > 0 ? Math.max(0, 1 + Math.log10(v / mx) / 6) : 0;
-            const c = v > 0 ? viridis(t) : [20, 20, 24];
-            p.fill(c[0], c[1], c[2]);
-            p.rect(rect.x + i * cw, rect.y + j * rh, Math.ceil(cw), Math.ceil(rh));
+    const W = rows[0].length;
+    const H = rows.length;
+    const key = ['dwt', scene.func.id, scene.func.expr || '', scene.get('wavelet.family'), scene.get('wavelet.level'),
+        scene.get('wavelet.keepPct'), scene.get('wavelet.samples'), wv.window.join(',')].join('|');
+    const img = slots.dwt.get(p, key, W, H, () => {
+        const out = new Uint8ClampedArray(W * H * 4);
+        let mx = 0;
+        for (const row of rows) for (const v of row) if (Number.isFinite(v)) mx = Math.max(mx, Math.abs(v));
+        for (let j = 0; j < H; j++) {
+            const row = rows[j];
+            const rep = W / row.length;
+            for (let i = 0; i < W; i++) {
+                const v = Math.abs(row[Math.min(row.length - 1, Math.floor(i / rep))]);
+                const t = v > 0 && mx > 0 ? Math.max(0, 1 + Math.log10(v / mx) / 6) : 0;
+                const c = v > 0 ? viridis(t) : [20, 20, 24];
+                const o = (j * W + i) * 4;
+                out[o] = c[0];
+                out[o + 1] = c[1];
+                out[o + 2] = c[2];
+                out[o + 3] = 255;
+            }
         }
-    }
+        return out;
+    });
+    const ctx = p.drawingContext;
+    if (ctx) ctx.imageSmoothingEnabled = false;
+    p.image(img, rect.x, rect.y, rect.w, rect.h);
+    if (ctx) ctx.imageSmoothingEnabled = true;
+    p.noStroke();
     p.fill(255);
     p.textFont(FONT);
     p.textSize(10);
     p.textAlign(p.LEFT, p.TOP);
-    p.text(`DWT coefficients (dark = discarded)  ${wv.family.id}  rows: d₁ … dⱼ, aⱼ`, rect.x + 6, rect.y + 4);
+    p.text(`DWT coefficients (dark = discarded)  ${wv.family.id}  rows: d\u2081 \u2026 d\u2c7c, a\u2c7c`, rect.x + 6, rect.y + 4);
     return true;
 }
 

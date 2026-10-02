@@ -18,5 +18,13 @@
 <body>
     <div id="app"></div>
     <noscript>This site needs JavaScript.</noscript>
+<script>
+    if (location.protocol === 'file:') {
+      document.addEventListener('DOMContentLoaded', function () {
+        var app = document.getElementById('app');
+        if (app) app.textContent = 'Please serve this folder over http (run ./server.sh) - ES modules do not load from file://';
+      });
+    }
+  </script>
 </body>
 </html>

@@ -145,7 +145,12 @@ export const wavelet = {
         const pct = env.get('wavelet.keepPct');
         const keep = pct >= 100 ? null : Math.max(1, Math.round(samples * pct / 100));
         const key = `wf|${func.id}|${familyId}|${x0}|${x1}|${samples}|${level}|${keep}`;
-        const res = memo(cache, key, () => waveletApprox(func.f, { family, level, x0, x1, samples, keep }));
+        // singularities / NaN would poison the whole transform: clamp and zero them
+        const safe = (x) => {
+            const y = func.f(x);
+            return Number.isFinite(y) ? Math.max(-1e3, Math.min(1e3, y)) : 0;
+        };
+        const res = memo(cache, key, () => waveletApprox(safe, { family, level, x0, x1, samples, keep }));
         return {
             info: `Wavelet  ${family.id}  J=${level}  keep ${res.keptCount}/${res.totalCount}`,
             result: res,

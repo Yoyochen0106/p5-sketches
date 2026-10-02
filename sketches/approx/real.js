@@ -12,10 +12,11 @@ const ERR_LO = -16;
 const ERR_HI = 2;
 const BIG = 1e7;
 
+/** Run fn with drawing clipped to rect r. Uses push/pop so p5's cached fill/stroke stay in sync. */
 export function withClip(p, r, fn) {
+    p.push();
     const ctx = p.drawingContext;
-    if (ctx && ctx.save) {
-        ctx.save();
+    if (ctx && ctx.beginPath) {
         ctx.beginPath();
         ctx.rect(r.x, r.y, r.w, r.h);
         ctx.clip();
@@ -23,8 +24,20 @@ export function withClip(p, r, fn) {
     try {
         fn();
     } finally {
-        if (ctx && ctx.restore) ctx.restore();
+        p.pop();
     }
+}
+
+/** Split the real panel rectangle into the plot area and the optional error strip below it. */
+export function splitReal(rect, showError) {
+    if (showError && rect.h > 260) {
+        const eh = Math.round(rect.h * 0.27);
+        return {
+            main: { x: rect.x, y: rect.y, w: rect.w, h: rect.h - eh },
+            err: { x: rect.x, y: rect.y + rect.h - eh, w: rect.w, h: eh },
+        };
+    }
+    return { main: rect, err: null };
 }
 
 function setStroke(p, hex, alpha = 255) {
@@ -256,18 +269,10 @@ function drawErrorStrip(p, scene, vp, rect) {
     p.line(px, rect.y, px, rect.y + rect.h);
 }
 
-/** Draws the whole real panel into `vp.rect` (error strip carved from the bottom). */
-export function drawRealPanel(p, scene, vp) {
+/** Draws the real panel: plot area = vp.rect, optional error strip = errRect. */
+export function drawRealPanel(p, scene, vp, errRect = null) {
     const { pal, func, fits } = scene;
-    const full = vp.rect;
-    let errRect = null;
-    let main = full;
-    if (scene.get('showError') && full.h > 260) {
-        const eh = Math.round(full.h * 0.27);
-        errRect = { x: full.x, y: full.y + full.h - eh, w: full.w, h: eh };
-        main = { x: full.x, y: full.y, w: full.w, h: full.h - eh };
-    }
-    vp.setRect(main.x, main.y, main.w, main.h);
+    const main = vp.rect;
 
     p.noStroke();
     p.fill(pal.panel);
