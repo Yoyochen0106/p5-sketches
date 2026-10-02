@@ -106,7 +106,7 @@ export const SKETCHES = [
     unit: 1,
     title: "Electrostatics: Fields, Potential & Gauss's Law",
     description: "Point charges and distributions: field lines, equipotentials, flux through closed surfaces and a numerical check of Gauss's law.",
-    planned: true,
+    load: () => import('./em-electrostatics/index.js'),
     prereqs: [],
     related: [
       { id: 'em-poisson', label: 'Laplace & Poisson solver', why: 'Solve for the potential with conductors and boundary conditions' },
@@ -120,7 +120,7 @@ export const SKETCHES = [
     unit: 2,
     title: 'Laplace & Poisson Solver: Conductors & Capacitance',
     description: 'Relaxation solvers for the potential between conductors, with charge density, boundary conditions and capacitance read-outs.',
-    planned: true,
+    load: () => import('./em-poisson/index.js'),
     prereqs: ['em-electrostatics'],
     related: [
       { id: 'em-electrostatics', label: 'Electrostatics', why: 'Point-charge fields that the solver should reproduce' },
