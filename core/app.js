@@ -71,7 +71,7 @@ export function createApp(opts = {}) {
     const toolbar = h('div', { class: 'toolbar' });
     const container = h('div', { class: 'sketch-container' });
     const drawer = h('div', { class: 'drawer-body' });
-    const drawerBtn = h('button', { type: 'button', class: 'bar-btn drawer-btn', 'aria-expanded': 'true', title: 'Settings (s)' }, 'Settings');
+    const drawerBtn = h('button', { type: 'button', class: 'bar-btn drawer-btn', 'aria-expanded': 'true', title: 'Settings (d)' }, 'Settings');
     const fsBtn = h('button', { type: 'button', class: 'bar-btn fs-btn', title: 'Fullscreen' }, 'Fullscreen');
     const back = h('a', { class: 'bar-btn back', href: '#/', title: 'Back to menu' }, 'Menu');
     const aside = h('aside', { class: 'drawer', id: 'drawer', 'aria-label': 'Settings' }, drawer);
@@ -97,7 +97,7 @@ export function createApp(opts = {}) {
       } catch { /* not supported */ }
     });
     const onKey = (e) => {
-      if (e.key !== 's' || e.ctrlKey || e.metaKey || e.altKey) return;
+      if (e.key !== 'd' || e.ctrlKey || e.metaKey || e.altKey) return;
       const t = e.target && e.target.tagName;
       if (t === 'INPUT' || t === 'TEXTAREA' || t === 'SELECT') return;
       setOpen(!open);

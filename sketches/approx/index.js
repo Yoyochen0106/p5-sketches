@@ -122,7 +122,7 @@ function buildSchema(parseExpression) {
         {
             type: 'info',
             text: 'Hover: move expansion point a · click: lock/unlock · drag: pan · wheel: zoom (shift = y, alt = x) · '
-                + '↑↓: Taylor order · 1 2 3: panels · space: animate · F: fit · M: next complex view',
+                + '↑↓ / W S: Taylor order · 1 2 3: panels · space: animate · F: fit · M: next complex view',
         },
     ];
 }
@@ -415,10 +415,12 @@ export default {
                 const k = p.key;
                 if (typing(k)) return true;
                 const step = p.keyIsDown && p.keyIsDown(16) ? 5 : 1;
-                if (p.keyCode === p.UP_ARROW || p.keyCode === p.DOWN_ARROW) {
-                    const dir = p.keyCode === p.UP_ARROW ? 1 : -1;
+                const up = p.keyCode === p.UP_ARROW || k === 'w' || k === 'W';
+                const down = p.keyCode === p.DOWN_ARROW || k === 's' || k === 'S';
+                if (up || down) {
+                    const dir = up ? 1 : -1;
                     stepOrder(dir, step);
-                    st.keyHold = { code: p.keyCode, dir, step, at: Date.now() + 350 };
+                    st.keyHold = { code: p.keyCode, key: k, dir, step, at: Date.now() + 350 };
                 } else if (k === '1') store.set('mode', 'real');
                 else if (k === '2') store.set('mode', 'split');
                 else if (k === '3') store.set('mode', 'complex');
@@ -441,7 +443,8 @@ export default {
             function tickKeyHold() {
                 const h = st.keyHold;
                 if (!h) return;
-                if (!(p.keyIsDown && p.keyIsDown(h.code))) {
+                const held = h.key && h.key.length === 1 ? h.key.toUpperCase().charCodeAt(0) : h.code;
+                if (!(p.keyIsDown && p.keyIsDown(held))) {
                     st.keyHold = null;
                     return;
                 }

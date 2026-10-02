@@ -15,7 +15,7 @@ export default {
       { type: 'color', key: 'color', label: 'Colour' },
       { type: 'slider', key: 'radius', label: 'Radius', min: 0.1, max: 0.9, step: 0.05, visibleIf: (s) => s.get('mode', 'orbit') === 'orbit' },
       { type: 'button', label: 'Reset', onClick: () => settings.reset() },
-      { type: 'info', text: 'Press "s" to toggle this drawer.' },
+      { type: 'info', text: 'Press "d" to toggle this drawer.' },
     ];
     // register defaults so the store knows them (and keeps the URL hash short)
     settings.get('mode', 'orbit'); settings.get('count', 12); settings.get('speed', 1);

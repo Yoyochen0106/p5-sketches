@@ -204,7 +204,7 @@ test('theme button cycles dark -> light -> auto, applies data-theme and persists
   await again.app.stop();
 }));
 
-test('drawer button and the "s" key toggle the drawer (ignored while typing in inputs)', () => withFakeDocument(async (doc) => {
+test('drawer button and the "d" key toggle the drawer (ignored while typing in inputs)', () => withFakeDocument(async (doc) => {
   const { root, app } = setup(doc, { hash: '#/hello' });
   await app.start();
   const page = root.querySelector('.sketch-page');
@@ -213,9 +213,9 @@ test('drawer button and the "s" key toggle the drawer (ignored while typing in i
   btn.click();
   assert.ok(!page.classList.contains('drawer-open'));
   assert.equal(btn.getAttribute('aria-expanded'), 'false');
-  doc.dispatch('keydown', { key: 's', target: doc.body });
+  doc.dispatch('keydown', { key: 'd', target: doc.body });
   assert.ok(page.classList.contains('drawer-open'));
-  doc.dispatch('keydown', { key: 's', target: doc.createElement('input') });
+  doc.dispatch('keydown', { key: 'd', target: doc.createElement('input') });
   assert.ok(page.classList.contains('drawer-open'));
   doc.dispatch('keydown', { key: 'x', target: doc.body });
   assert.ok(page.classList.contains('drawer-open'));

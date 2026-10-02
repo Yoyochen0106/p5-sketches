@@ -126,7 +126,8 @@ function drawReadout(p, scene, rect) {
     p.fill(pal.fg);
     tw.type(`f(x) = ${func.label}`).newline();
     p.fill(pal.muted);
-    tw.type(`a = ${fmtCenter(a)}`);
+    const fa = a[1] === 0 ? func.f(a[0]) : NaN;
+    tw.type(`a = ${fmtCenter(a)}${Number.isFinite(fa) ? `   f(a) = ${fa.toFixed(4)}` : ''}`);
     if (scene.get('lockOn')) tw.type('  \u{1F512}');
     tw.newline();
 
